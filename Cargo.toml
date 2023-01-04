@@ -1,0 +1,31 @@
+[package]
+name = "traefik-auth"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-web = { version = "4.2", default-features = false, features = ["macros", "cookies", "secure-cookies", "compress-gzip"] }
+actix-session = { version = "0.7", features = ["cookie-session"] }
+async-trait = "0.1"
+awc = { version = "3.0", default-features = false, features = ["compress-gzip", "openssl"] }
+base64 = "0.20"
+config = { version = "0.13", default-features = false, features = ["json", "yaml"] }
+env_logger = { version = "0.10", default-features = false, features = ["humantime", "color", "regex"] }
+htpasswd-verify = "0.2"
+josekit = "0.8"
+log = { version = "0.4", features = ["std", "serde"] }
+serde = "1.0"
+oauth2 = { version = "4.3", default-features = false }
+orion = "0.17"
+
+
+[profile.dev]
+split-debuginfo = "unpacked"
+
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld",
+]

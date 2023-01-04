@@ -1,0 +1,10 @@
+logger:
+  level: INFO
+  levels:
+    actix_web: INFO
+
+public_url: 'http://localhost:8080'
+cookie_domain: null
+
+providers: {}
+pipelines: []
