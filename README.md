@@ -4,6 +4,8 @@ A small project to protect services using other kind of authentication methods a
 
 ## Deploy
 
+Pull image from Docker Hub [`melchor9000/traefik-auth`][docker-hub]. Supported architectures are Intel/AMD 64 and ARM 64.
+
 Use a container runtime to run the service, either docker or podman, or run inside a container orquestrator (like swarm or kubernetes).
 
 See below an example for docker compose:
@@ -171,3 +173,4 @@ providers:
 ```
 
   [forward-auth]: https://doc.traefik.io/traefik/middlewares/http/forwardauth/
+  [docker-hub]: https://hub.docker.com/repository/docker/melchor9000/traefik-auth
