@@ -1,6 +1,7 @@
 use std::{path::PathBuf, fs::File, io::Read};
 
 use async_trait::async_trait;
+use base64::Engine;
 
 use super::{AuthContext, AuthProvider, AuthResponse, AuthError};
 
@@ -23,7 +24,7 @@ impl BasicAuthProvider {
     }
 
     fn check(&self, username: &str, password: &str) -> bool {
-        let users = htpasswd_verify::load(&self.data);
+        let users = htpasswd_verify::Htpasswd::from(&self.data as &str);
         users.check(username, password)
     }
 }
@@ -44,7 +45,7 @@ impl AuthProvider for BasicAuthProvider {
             return Ok(AuthResponse::Unauthorized);
         }
 
-        let bd = base64::decode(auth_split[1])?;
+        let bd = base64::engine::general_purpose::STANDARD.decode(auth_split[1])?;
         let decoded = String::from_utf8(bd)?;
 
         let Some((username, password)) = decoded.split_once(":") else {

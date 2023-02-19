@@ -1,6 +1,6 @@
 use std::{string::FromUtf8Error, fmt::Display, path::Path, fs::File, io::{ErrorKind, Read, Write}};
 
-use base64::{DecodeError, engine::fast_portable::{FastPortable, FastPortableConfig}};
+use base64::{DecodeError, engine::general_purpose::URL_SAFE as BASE64_ENGINE, Engine};
 use orion::{aead, auth, errors};
 
 pub(crate) struct CryptoState {
@@ -8,11 +8,6 @@ pub(crate) struct CryptoState {
     hash_key: auth::SecretKey,
     cookie_key: actix_web::cookie::Key,
 }
-
-const BASE64_ENGINE: FastPortable = FastPortable::from(
-    &base64::alphabet::URL_SAFE,
-    FastPortableConfig::new().with_encode_padding(true),
-);
 
 #[derive(Debug, Clone)]
 pub(crate) enum CryptoError {
@@ -75,8 +70,8 @@ impl CryptoState {
             return Err(CryptoError::BadSyntax);
         };
 
-        let content_bytes = base64::decode_engine(content, &BASE64_ENGINE)?;
-        let hash_bytes = base64::decode_engine(hash, &BASE64_ENGINE)?;
+        let content_bytes = BASE64_ENGINE.decode(content)?;
+        let hash_bytes = BASE64_ENGINE.decode(hash)?;
 
         let decrypted = self.decrypt(&content_bytes)?;
         self.verify(&decrypted, &hash_bytes)?;
@@ -97,8 +92,8 @@ impl CryptoState {
         let encrypted = self.encrypt(&data)?;
         let signed = self.sign(data)?;
 
-        let encrypted = base64::encode_engine(encrypted, &BASE64_ENGINE);
-        let signed = base64::encode_engine(signed, &BASE64_ENGINE);
+        let encrypted = BASE64_ENGINE.encode(encrypted);
+        let signed = BASE64_ENGINE.encode(signed);
         Ok(format!("{}.{}", encrypted, signed))
     }
 
