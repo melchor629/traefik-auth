@@ -3,24 +3,72 @@ name: Container Image
 on:
   push:
     branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
 
 env:
   REGISTRY: docker.io
   IMAGE_NAME: melchor9000/traefik-auth
 
 jobs:
-  build:
-
+  build-binary:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
+    strategy:
+      fail-fast: true
+      matrix:
+        target:
+        - x86_64-unknown-linux-gnu
+        - aarch64-unknown-linux-gnu
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
-        
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+        # run: |
+        #   VERSION=$(curl -sSL https://api.github.com/repos/cross-rs/cross/releases/latest | jq -r '.tag_name')
+        #   FILE_NAME="cross-x86_64-unknown-linux-gnu.tar.gz"
+        #   URL="https://github.com/cross-rs/cross/releases/download/${VERSION}/${FILE_NAME}"
+        #   echo Downloading "$URL"
+        #   wget "$URL"
+        #   echo Extracting "$FILE_NAME"
+        #   tar -xvzf "${FILE_NAME}" -C $HOME/.cargo/bin
+
+      - name: Build binary
+        run: |
+          cross build --target ${{ matrix.target }} --release
+          mkdir dist
+          tag=$(echo ${{ matrix.target }} | cut -d- -f1)
+          cp target/${{ matrix.target }}/release/traefik-auth dist/traefik-auth-${tag}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: binaries
+          path: dist
+
+
+  build-docker:
+    runs-on: ubuntu-latest
+    needs: build-binary
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: binaries
+          path: dist/
+
+      - name: Fix permissions
+        run: chmod 755 dist/traefik-auth-*
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
@@ -47,8 +95,8 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
-          file: ./Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
+          file: ./Dockerfile.release
+          push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64

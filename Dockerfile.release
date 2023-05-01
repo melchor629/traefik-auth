@@ -1,0 +1,15 @@
+FROM debian:11-slim AS binary
+
+COPY --chown=root:root ./dist/ /dist/
+RUN cp ./dist/traefik-auth-$(uname -m) /dist/traefik-auth
+
+
+FROM debian:11-slim AS final
+
+RUN apt-get update && \
+    apt-get install -y libssl1.1 ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+COPY ./config/default.yml /config/
+COPY --from=binary /dist/traefik-auth /usr/local/bin/
+
+ENTRYPOINT ["traefik-auth"]

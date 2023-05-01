@@ -24,10 +24,10 @@ RUN cargo install --path .
 
 FROM debian:11-slim AS final
 
-COPY ./config/default.yml /config/
 RUN apt-get update && \
     apt-get install -y libssl1.1 ca-certificates && \
     rm -rf /var/lib/apt/lists/*
+COPY ./config/default.yml /config/
 COPY --from=builder /usr/local/cargo/bin/traefik-auth /usr/local/bin/
 
 ENTRYPOINT ["traefik-auth"]
