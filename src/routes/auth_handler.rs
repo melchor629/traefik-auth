@@ -122,6 +122,7 @@ pub(crate) async fn handler(
             .body("No auth pipeline configured that can handle this request");
     };
 
+    log::debug!(target: LOG_TARGET, "Using pipeline {:?}", pipeline);
     let Some(cookie) = req.cookie(COOKIE_NAME) else {
         log::debug!(target: LOG_TARGET, "Starting login process due to cookie not found");
         return auth_redirect(&req, &auth_providers, &crypto_state, pipeline).await;
@@ -203,8 +204,7 @@ fn get_headers(headers: &HeaderMap) -> AuthContextHeaders {
 
 #[inline]
 fn check_can_access(pipeline: &AuthPipeline, sub: &str) -> Option<HttpResponse> {
-    if pipeline.valid_users.is_some() {
-        let valid_users = pipeline.valid_users.as_ref().unwrap();
+    if let Some(valid_users) = pipeline.valid_users.as_ref() {
         if !valid_users.contains(&sub.to_string()) {
             log::debug!(target: LOG_TARGET, "User {sub} is not allowed to access to this resource");
             return Some(HttpResponse::Forbidden()
