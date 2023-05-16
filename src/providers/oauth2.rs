@@ -157,7 +157,10 @@ impl AuthProvider for OAuth2Provider {
             let (payload, _) = josekit::jwt::decode_with_verifier(token_bytes, verifier.as_ref())?;
 
             return Ok(match payload.claim("sub") {
-                Some(sub) => AuthResponse::Success(sub.to_string()),
+                Some(sub) => match sub.as_str() {
+                    Some(sub_str) => AuthResponse::Success(sub_str.into()),
+                    None => AuthResponse::Unauthorized,
+                },
                 None => AuthResponse::Unauthorized,
             });
         }
