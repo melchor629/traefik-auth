@@ -1,4 +1,4 @@
-use std::{cell::RefCell, sync::{Arc, Mutex}};
+use std::{cell::RefCell, sync::{Arc, Mutex}, collections::HashMap};
 
 use async_trait::async_trait;
 use oauth2::{basic::BasicClient, ClientId, ClientSecret, AuthUrl, RedirectUrl, PkceCodeChallenge, CsrfToken, TokenUrl, AuthorizationCode, PkceCodeVerifier, TokenResponse, Scope};
@@ -22,6 +22,7 @@ pub(crate) struct OAuth2Provider {
     client_secret: Option<ClientSecret>,
     redirect_url: RedirectUrl,
     scopes: Vec<String>,
+    map_claims: HashMap<String, String>,
     inner: Arc<Mutex<RefCell<OAuth2ProviderInner>>>,
 }
 
@@ -39,6 +40,7 @@ impl OAuth2Provider {
         issuer: String,
         scopes: Vec<String>,
         public_url: String,
+        map_claims: HashMap<String, String>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
             client_id: ClientId::new(client_id),
@@ -46,6 +48,7 @@ impl OAuth2Provider {
             redirect_url: RedirectUrl::new(format!("{}/oauth2/callback", public_url))?,
             issuer,
             scopes,
+            map_claims,
             inner: Arc::new(Mutex::new(OAuth2ProviderInner::default().into())),
         })
     }
@@ -156,9 +159,19 @@ impl AuthProvider for OAuth2Provider {
 
             let (payload, _) = josekit::jwt::decode_with_verifier(token_bytes, verifier.as_ref())?;
 
+            // map claims from oauth2 token to our token
+            let mut claims = HashMap::<String, String>::new();
+            for (source_claim, target_claim) in self.map_claims.iter() {
+                if let Some(claim) = payload.claim(&source_claim) {
+                    if let Some(claim_str) = claim.as_str() {
+                        claims.insert(target_claim.clone(), claim_str.into());
+                    }
+                }
+            }
+
             return Ok(match payload.claim("sub") {
                 Some(sub) => match sub.as_str() {
-                    Some(sub_str) => AuthResponse::Success(sub_str.into()),
+                    Some(sub_str) => AuthResponse::Success(sub_str.into(), claims),
                     None => AuthResponse::Unauthorized,
                 },
                 None => AuthResponse::Unauthorized,

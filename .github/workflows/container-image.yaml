@@ -2,7 +2,7 @@ name: Container Image
 
 on:
   push:
-    branches: [ "master" ]
+    tags: ['*']
 
 env:
   REGISTRY: docker.io

@@ -13,6 +13,8 @@ pub(crate) struct LoggerSettings {
 pub(crate) struct BasicAuthProviderSettings {
     pub contents: Option<String>,
     pub file: Option<PathBuf>,
+    #[serde(default)]
+    pub claims: HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -21,6 +23,8 @@ pub(crate) struct OAuth2ProviderSettings {
     pub client_secret: Option<String>,
     pub issuer: String,
     pub scopes: Vec<String>,
+    #[serde(default)]
+    pub map_claims: HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -55,11 +59,19 @@ pub(crate) struct AuthPipelineCookie {
     pub domain: Option<String>,
 }
 
+#[derive(Clone, Default, Debug, Deserialize)]
+pub(crate) struct AuthClaims {
+    #[serde(default)]
+    pub sub: Vec<String>,
+    #[serde(flatten, default)]
+    pub other: HashMap<String, String>
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct AuthPipeline {
     #[serde(default)]
     pub rules: Vec<AuthRule>,
-    pub valid_users: Option<Vec<String>>,
+    pub claims: Option<AuthClaims>,
     pub providers: Vec<String>,
     #[serde(default)]
     pub cookie: AuthPipelineCookie,

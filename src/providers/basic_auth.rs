@@ -1,4 +1,4 @@
-use std::{path::PathBuf, fs::File, io::Read};
+use std::{path::PathBuf, fs::File, io::Read, collections::HashMap};
 
 use async_trait::async_trait;
 use base64::Engine;
@@ -7,20 +7,22 @@ use super::{AuthContext, AuthProvider, AuthResponse, AuthError};
 
 pub(crate) struct BasicAuthProvider {
     data: String,
+    claims: HashMap<String, String>
 }
 
 impl BasicAuthProvider {
-    pub(crate) fn from_contents(data: &str) -> Self {
+    pub(crate) fn from_contents(data: &str, claims: HashMap<String, String>) -> Self {
         Self {
             data: data.into(),
+            claims,
         }
     }
 
-    pub(crate) fn from_file(path: &PathBuf) -> std::io::Result<Self> {
+    pub(crate) fn from_file(path: &PathBuf, claims: HashMap<String, String>) -> std::io::Result<Self> {
         let mut file = File::open(path)?;
         let mut buffer = String::new();
         file.read_to_string(&mut buffer)?;
-        Ok(Self::from_contents(buffer.as_str()))
+        Ok(Self::from_contents(buffer.as_str(), claims))
     }
 
     fn check(&self, username: &str, password: &str) -> bool {
@@ -53,7 +55,7 @@ impl AuthProvider for BasicAuthProvider {
         };
 
         if self.check(username, password) {
-            Ok(AuthResponse::Success(username.into()))
+            Ok(AuthResponse::Success(username.into(), self.claims.clone()))
         } else {
             Ok(AuthResponse::Unknown(username.into()))
         }

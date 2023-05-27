@@ -1,4 +1,4 @@
-use std::{sync::Arc, cell::RefCell};
+use std::{sync::Arc, cell::RefCell, collections::HashMap};
 
 use actix_session::SessionExt;
 use actix_web::{get, HttpRequest, HttpResponse, Responder, web, http::header, http::header::HeaderMap, cookie::{Cookie, SameSite, time::{OffsetDateTime, Duration}}};
@@ -37,12 +37,12 @@ pub(crate) async fn auth_redirect(
             .body("No configured auth providers authorized this request");
     };
 
-    let AuthResponse::Success(sub) = response else {
+    let AuthResponse::Success(sub, claims) = response else {
         return build_response(response, &context);
     };
 
     // check user is valid
-    if let Some(http_response) = check_can_access(&pipeline, &sub) {
+    if let Some(http_response) = check_can_access(&pipeline, &sub, &claims) {
         return http_response;
     }
 
@@ -61,6 +61,9 @@ pub(crate) async fn auth_redirect(
 
     let mut payload = josekit::jwt::JwtPayload::new();
     payload.set_claim("sub", Some(sub.clone().into())).expect("?");
+    for (claim_key, claim_value) in claims {
+        payload.set_claim(&claim_key, Some(claim_value.into())).expect("?");
+    }
 
     let mut header = josekit::jws::JwsHeader::new();
     header.set_algorithm("none");
@@ -150,8 +153,14 @@ pub(crate) async fn handler(
         return auth_redirect(&req, &auth_providers, &crypto_state, pipeline).await;
     };
 
+    let claims = token_payload
+        .claims_set()
+        .iter()
+        .filter_map(|p| p.1.as_str().map(|v| (p.0.clone(), v.to_string())))
+        .collect::<HashMap<String, String>>();
+
     // check user is valid
-    if let Some(http_response) = check_can_access(&pipeline, &sub) {
+    if let Some(http_response) = check_can_access(&pipeline, &sub, &claims) {
         return http_response;
     }
 
@@ -203,10 +212,23 @@ fn get_headers(headers: &HeaderMap) -> AuthContextHeaders {
 }
 
 #[inline]
-fn check_can_access(pipeline: &AuthPipeline, sub: &str) -> Option<HttpResponse> {
-    if let Some(valid_users) = pipeline.valid_users.as_ref() {
-        if !valid_users.contains(&sub.to_string()) {
-            log::debug!(target: LOG_TARGET, "User {sub} is not allowed to access to this resource");
+fn check_can_access(
+    pipeline: &AuthPipeline,
+    sub: &str,
+    claims: &HashMap<String, String>,
+) -> Option<HttpResponse> {
+    let Some(pipeline_claims) = &pipeline.claims else { return None; };
+
+    if !pipeline_claims.sub.is_empty() && !pipeline_claims.sub.contains(&sub.to_string()) {
+        log::debug!(target: LOG_TARGET, "User {sub} is not allowed to access to this resource");
+        return Some(HttpResponse::Forbidden()
+            .append_header(("X-Forwarded-User", sub))
+            .body("You are not allowed to access here"));
+    }
+
+    for (claim_key, claim_values) in pipeline_claims.other.iter() {
+        if !claims.contains_key(claim_key) || !claim_values.contains(&claims[claim_key]) {
+            log::debug!(target: LOG_TARGET, "User {sub} does not have an allowed {claim_key} claim to access to this resource");
             return Some(HttpResponse::Forbidden()
                 .append_header(("X-Forwarded-User", sub))
                 .body("You are not allowed to access here"));
@@ -240,7 +262,7 @@ fn build_response(auth_response: AuthResponse, context: &AuthContext) -> HttpRes
                 .body(format!("There is something wrong with data provided for user {sub}"))
         },
         // this branch should never run
-        AuthResponse::Success(_) => HttpResponse::Ok().finish(),
+        AuthResponse::Success(_, _) => HttpResponse::Ok().finish(),
     }
 }
 

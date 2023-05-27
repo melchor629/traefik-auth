@@ -31,7 +31,7 @@ pub(crate) trait AuthSession {
 }
 
 pub(crate) enum AuthResponse {
-    Success(String),
+    Success(String, HashMap<String, String>),
     Redirect(String),
     Unknown(String),
     Unauthorized,
@@ -58,12 +58,21 @@ impl AuthProviders {
                 AuthProviderSettings::Basic(basic_settings) =>
                     if basic_settings.contents.is_some() {
                         let contents = basic_settings.contents.as_ref().unwrap().as_str();
-                        Box::new(BasicAuthProvider::from_contents(contents))
+                        Box::new(BasicAuthProvider::from_contents(
+                            contents,
+                            basic_settings.claims.clone(),
+                        ))
                     } else if  basic_settings.file.is_some() {
                         let path = basic_settings.file.as_ref().unwrap();
-                        Box::new(BasicAuthProvider::from_file(path).unwrap())
+                        Box::new(BasicAuthProvider::from_file(
+                            path,
+                            basic_settings.claims.clone()
+                        ).unwrap())
                     } else {
-                        Box::new(BasicAuthProvider::from_contents("\n"))
+                        Box::new(BasicAuthProvider::from_contents(
+                            "\n",
+                            basic_settings.claims.clone()
+                        ))
                     },
                 AuthProviderSettings::OAuth2(oauth2_settings) =>
                     Box::new(OAuth2Provider::new(
@@ -72,6 +81,7 @@ impl AuthProviders {
                         oauth2_settings.issuer.clone(),
                         oauth2_settings.scopes.clone(),
                         settings.public_url.clone(),
+                        oauth2_settings.map_claims.clone(),
                     ).expect("There is something wrong in OAuth2 configuration")),
             };
             providers.insert(provider_id.clone(), provider);

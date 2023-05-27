@@ -69,6 +69,10 @@ providers:
   basic-file:
     basic:
       file: '/path/to/htpasswd/file'
+    # optional: list of claims to add to the token for the users in this provider
+    #           this can help allow users to access several service based on claims
+    claims:
+      role: admin
   oauth2:
     oauth2:
       client_id: client id
@@ -76,6 +80,13 @@ providers:
       client_secret: client secret
       issuer: https://url.to.issuer
       scopes: [scope1, scope2, scope3, '...']
+      # optional: map other claims from the access token to this service's token
+      #           can be used to allow access to services based on claims
+      map_claims:
+        # maps a claim named `oauth_claim` from the OIDC provider to `service_claim` in this service
+        oauth_claim: service_claim
+        # maps email to email :)
+        email: email
 
 # authentication pipelines (rules run sequentially)
 pipelines:
@@ -95,8 +106,13 @@ pipelines:
       - and:
           - http_host: host
           - '...'
-    # optional: usernames that will be allowed to access (checks `sub` claim in OAuth2)
-    valid_users: [a, b, c]
+    # optional: allow access to users that matches the following claims
+    claims:
+      # optional: usernames that will be allowed to access (checks `sub` claim in OAuth2)
+      sub: [a, b, c]
+      # optional: other values will be checked against the claims stored in the service token
+      role: admin
+      service_claim: example
     providers: [basic-inline, basic-file, oauth2]
     # optional: customize login cookie
     cookie:
