@@ -1882,7 +1882,7 @@ dependencies = [
 
 [[package]]
 name = "traefik-auth"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "actix-session",
  "actix-web",
