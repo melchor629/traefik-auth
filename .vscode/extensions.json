@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "vadimcn.vscode-lldb",
+    "EditorConfig.EditorConfig",
+    "rust-lang.rust-analyzer"
+  ],
+  "unwantedRecommendations": [
+    "ms-azuretools.vscode-docker"
+  ]
+}
