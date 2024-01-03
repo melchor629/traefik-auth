@@ -50,6 +50,9 @@ pub(crate) struct AuthProviders {
     pipelines: Vec<AuthPipeline>,
 }
 
+#[cfg(test)]
+pub(crate) struct AuthSessionTest();
+
 impl AuthProviders {
     pub(crate) fn create(settings: &Settings) -> Self {
         let mut providers = HashMap::new();
@@ -108,4 +111,13 @@ impl AuthProviders {
     pub(crate) fn pipelines(&self) -> &Vec<AuthPipeline> {
         &self.pipelines
     }
+}
+
+#[cfg(test)]
+impl AuthSession for AuthSessionTest {
+    fn get(&self, _key: String) -> Option<String> { None }
+
+    fn set(&self, _key: String, _value: String) {}
+
+    fn delete(&self, _key: String) -> bool { true }
 }

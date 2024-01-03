@@ -64,9 +64,11 @@ keys_path: '/data/keys'
 providers:
   # providers are identified by this key
   basic-inline:
+    # NOTE: format is htpasswd, but only supports bcrypt (the others are insecure)
     basic:
       contents: 'htpasswd file contents here'
   basic-file:
+    # NOTE: format is htpasswd, but only supports bcrypt (the others are insecure)
     basic:
       file: '/path/to/htpasswd/file'
     # optional: list of claims to add to the token for the users in this provider
