@@ -7,13 +7,13 @@ edition = "2021"
 
 [dependencies]
 actix-web = { version = "4.2", default-features = false, features = ["macros", "cookies", "secure-cookies", "compress-gzip"] }
-actix-session = { version = "0.8", features = ["cookie-session"] }
+actix-session = { version = "0.9", features = ["cookie-session"] }
 async-trait = "0.1"
 awc = { version = "3.0", default-features = false, features = ["compress-gzip", "openssl"] }
 base64 = "0.21"
 bcrypt = "0.15"
-config = { version = "0.13", default-features = false, features = ["json", "yaml"] }
-env_logger = { version = "0.10", default-features = false, features = ["humantime", "color", "regex"] }
+config = { version = "0.14", default-features = false, features = ["json", "yaml"] }
+env_logger = { version = "0.11", default-features = false, features = ["humantime", "color", "regex"] }
 josekit = "0.8"
 log = { version = "0.4", features = ["std", "serde"] }
 serde = "1.0"
