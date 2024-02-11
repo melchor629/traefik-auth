@@ -1,3 +1,5 @@
+ARG SOURCE=builder
+
 FROM lukemathwalker/cargo-chef:latest-rust-1 AS base
 
 # plan dependency installation
@@ -22,12 +24,31 @@ COPY ./src ./src
 RUN cargo install --path .
 
 
+# grab binary from outside (using cross)
+FROM debian:11-slim AS binary
+
+COPY --chown=root:root ./dist/ /dist/
+RUN mkdir -p /usr/local/cargo/bin/
+RUN cp ./dist/traefik-auth-$(uname -m) /usr/local/cargo/bin/traefik-auth
+
+
+# stage to grab binary based on build arg
+FROM ${SOURCE} AS binary-selector
+
+RUN cp /usr/local/cargo/bin/traefik-auth /
+
+
 FROM debian:11-slim AS final
 
+ARG TARGETARCH
+ARG DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && \
-    apt-get install -y libssl1.1 ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
-COPY ./config/default.yml /config/
-COPY --from=builder /usr/local/cargo/bin/traefik-auth /usr/local/bin/
+     apt-get install -y libssl1.1 ca-certificates && \
+     rm -rf /var/lib/apt/lists/*
+ COPY ./config/default.yml /config/
+ COPY --from=binary /dist/traefik-auth /usr/local/bin/
+
+USER 1000:999
 
 ENTRYPOINT ["traefik-auth"]
