@@ -46,8 +46,8 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
      apt-get install -y libssl1.1 ca-certificates && \
      rm -rf /var/lib/apt/lists/*
- COPY ./config/default.yml /config/
- COPY --from=binary /dist/traefik-auth /usr/local/bin/
+COPY ./config/default.yml /config/
+COPY --from=binary /usr/local/cargo/bin/traefik-auth /usr/local/bin/
 
 USER 1000:999
 
