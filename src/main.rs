@@ -20,13 +20,17 @@ async fn main() -> std::io::Result<()> {
         Some(path) => CryptoState::from_file(path)?,
     });
     let auth_providers = web::Data::new(AuthProviders::create(&settings));
+    let public_url = awc::http::Uri::try_from(settings.public_url.clone()).ok();
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), crypto.cookie_key().clone())
-                    .cookie_secure(settings.public_url.starts_with("https://"))
+                    .cookie_secure(settings.cookie.secure.unwrap_or(settings.public_url.starts_with("https://")))
+                    .cookie_domain(
+                        settings.cookie.domain.clone().or(public_url.clone().and_then(|u| u.host().map(|h| h.into())))
+                    )
                     .cookie_content_security(CookieContentSecurity::Private)
                     .cookie_name("ta-s".into())
                     .build()

@@ -77,9 +77,18 @@ pub(crate) struct AuthPipeline {
     pub cookie: AuthPipelineCookie,
 }
 
+#[derive(Clone, Default, Debug, Deserialize)]
+pub(crate) struct CookieSettings {
+    #[serde(default)]
+    pub domain: Option<String>,
+    #[serde(default)]
+    pub secure: Option<bool>,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct Settings {
     pub logger: LoggerSettings,
+    pub cookie: CookieSettings,
     pub providers: HashMap<String, AuthProviderSettings>,
     pub pipelines: Vec<AuthPipeline>,
     pub public_url: String,
