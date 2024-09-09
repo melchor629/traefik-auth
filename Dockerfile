@@ -1,4 +1,5 @@
 ARG SOURCE=builder
+ARG IMAGE_TAG=11-slim
 
 FROM lukemathwalker/cargo-chef:latest-rust-1 AS base
 
@@ -6,7 +7,7 @@ FROM lukemathwalker/cargo-chef:latest-rust-1 AS base
 FROM base AS planner
 
 WORKDIR /usr/src/traefik-auth
-COPY ./Cargo.toml ./Cargo.lock .
+COPY ./Cargo.toml ./Cargo.lock ./
 RUN mkdir src && \
     echo "fn main() {}" > src/main.rs && \
     cargo chef prepare --recipe-path recipe.json
@@ -25,7 +26,7 @@ RUN cargo install --path .
 
 
 # grab binary from outside (using cross)
-FROM debian:11-slim AS binary
+FROM debian:${IMAGE_TAG} AS binary
 
 COPY --chown=root:root ./dist/ /dist/
 RUN mkdir -p /usr/local/cargo/bin/
@@ -38,14 +39,14 @@ FROM ${SOURCE} AS binary-selector
 RUN cp /usr/local/cargo/bin/traefik-auth /
 
 
-FROM debian:11-slim AS final
+FROM debian:${IMAGE_TAG} AS final
 
 ARG TARGETARCH
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-     apt-get install -y libssl1.1 ca-certificates && \
-     rm -rf /var/lib/apt/lists/*
+    apt-get install -y libssl1.1 ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 COPY ./config/default.yml /config/
 COPY --from=binary /usr/local/cargo/bin/traefik-auth /usr/local/bin/
 
