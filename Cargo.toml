@@ -1,6 +1,6 @@
 [package]
 name = "traefik-auth"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -14,7 +14,7 @@ base64 = "0.22"
 bcrypt = "0.15"
 config = { version = "0.14", default-features = false, features = ["json", "yaml"] }
 env_logger = { version = "0.11", default-features = false, features = ["humantime", "color", "regex"] }
-josekit = "0.8"
+josekit = "0.10"
 log = { version = "0.4", features = ["std", "serde"] }
 serde = "1.0"
 oauth2 = { version = "4.3", default-features = false }
