@@ -1,6 +1,6 @@
 [package]
 name = "traefik-auth"
-version = "0.3.4"
+version = "0.3.5"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,7 +11,7 @@ actix-session = { version = "0.10", features = ["cookie-session"] }
 async-trait = "0.1"
 awc = { version = "3.0", default-features = false, features = ["compress-gzip", "openssl"] }
 base64 = "0.22"
-bcrypt = "0.15"
+bcrypt = "0.16"
 config = { version = "0.14", default-features = false, features = ["json", "yaml"] }
 env_logger = { version = "0.11", default-features = false, features = ["humantime", "color", "regex"] }
 josekit = "0.10"
