@@ -6,3 +6,9 @@ updates:
       interval: weekly
       day: saturday
       time: '10:00'
+  - package-ecosystem: cargo
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: saturday
+      time: '10:00'
