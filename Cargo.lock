@@ -1167,9 +1167,9 @@ checksum = "d75a2a4b1b190afb6f5425f10f6a8f959d2ea0b9c2b1d79553551850539e4674"
 
 [[package]]
 name = "josekit"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a603084e34e151e215d232e401df0d9299bdced264b8054e4888ea614e59bb06"
+checksum = "fe0633782b10949cf7d5aca9ec7c87ce642cbe4fff7d34602b2ec2e890ad56e5"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
