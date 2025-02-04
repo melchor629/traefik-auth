@@ -17,7 +17,7 @@ env_logger = { version = "0.11", default-features = false, features = ["humantim
 josekit = "0.10"
 log = { version = "0.4", features = ["std", "serde"] }
 serde = "1.0"
-oauth2 = { version = "4.3", default-features = false }
+oauth2 = { version = "5.0", default-features = false }
 orion = "0.17"
 
 [dev-dependencies]
