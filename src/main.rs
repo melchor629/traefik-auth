@@ -52,24 +52,27 @@ fn read_config() -> config::Settings {
         Err(e) => {
             eprint!("Error in configuration:\n  ");
             match e {
+                ::config::ConfigError::At { error, origin, key } =>
+                    eprintln!("Cannot read {0} key from {1}: {error}", key.unwrap_or("{unknown}".into()), origin.unwrap_or("<unknown>".into())),
                 ::config::ConfigError::FileParse { uri, cause } =>
                     eprintln!("Cannot parse file {0}: {cause}.", uri.unwrap_or("unknown".into())),
                 ::config::ConfigError::Foreign(err) =>
                     eprintln!("Unknown error: {err}."),
+                ::config::ConfigError::Frozen =>
+                    eprintln!("Configuration is frozen! (this is a bug)"),
                 ::config::ConfigError::Message(msg) =>
                     eprintln!("{msg}."),
                 ::config::ConfigError::NotFound(property) =>
                     eprintln!("Property not found: {property}."),
-                ::config::ConfigError::PathParse(err) =>
-                    eprintln!("Could not parse path: {}.", err.description()),
+                ::config::ConfigError::PathParse{ cause } =>
+                    eprintln!("Could not parse path: {}.", cause),
                 ::config::ConfigError::Type { origin, unexpected, expected, key } =>
                     eprintln!(
                         "Property {1} has an invalid value: Expected type {expected} but found {unexpected} (source {0}).",
                         origin.unwrap_or("unknown".into()),
                         key.unwrap_or("?".into()),
                     ),
-                ::config::ConfigError::Frozen =>
-                    eprintln!("?"),
+                _ => eprintln!("Unknown error happened while parsing configuration"),
             };
             std::process::exit(1)
         },

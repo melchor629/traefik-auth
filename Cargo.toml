@@ -12,12 +12,12 @@ async-trait = "0.1"
 awc = { version = "3.0", default-features = false, features = ["compress-gzip", "openssl"] }
 base64 = "0.22"
 bcrypt = "0.17"
-config = { version = "0.14", default-features = false, features = ["json", "yaml"] }
+config = { version = "0.15", default-features = false, features = ["json", "yaml"] }
 env_logger = { version = "0.11", default-features = false, features = ["humantime", "color", "regex"] }
 josekit = "0.10"
 log = { version = "0.4", features = ["std", "serde"] }
 serde = "1.0"
-oauth2 = { version = "4.3", default-features = false }
+oauth2 = { version = "5.0", default-features = false }
 orion = "0.17"
 
 [dev-dependencies]

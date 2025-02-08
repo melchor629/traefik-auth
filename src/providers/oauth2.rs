@@ -1,19 +1,22 @@
 use std::{cell::RefCell, sync::{Arc, Mutex}, collections::HashMap};
 
 use async_trait::async_trait;
-use oauth2::{basic::BasicClient, ClientId, ClientSecret, AuthUrl, RedirectUrl, PkceCodeChallenge, CsrfToken, TokenUrl, AuthorizationCode, PkceCodeVerifier, TokenResponse, Scope};
+use oauth2::{basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl};
 
-use crate::logic::oauth2_http_client::async_http_client;
+use crate::logic::oauth2_http_client::OAuth2HttpClient;
 
 use super::{AuthContext, AuthProvider, AuthResponse, AuthError};
 
 const LOG_TARGET: &str = "traefik_auth::oauth2";
 
+type BasicOauthClient = BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
+
 #[derive(Default)]
 struct OAuth2ProviderInner {
-    client: Option<BasicClient>,
+    client: Option<BasicOauthClient>,
     openid_configuration: Option<OpenidConfiguration>,
     jwks: Option<josekit::jwk::JwkSet>,
+    http_client: OAuth2HttpClient,
 }
 
 pub(crate) struct OAuth2Provider {
@@ -53,7 +56,7 @@ impl OAuth2Provider {
         })
     }
 
-    async fn configure(&self) -> Result<BasicClient, Box<dyn std::error::Error>> {
+    async fn configure(&self) -> Result<BasicOauthClient, Box<dyn std::error::Error>> {
         let client = awc::Client::default();
         let inner_lock = self.inner.lock().unwrap();
         let mut inner = inner_lock.borrow_mut();
@@ -84,14 +87,14 @@ impl OAuth2Provider {
 
         if inner.client.is_none() {
             log::debug!(target: LOG_TARGET, "Creating OAuth2 client for issuer {}", self.issuer);
-            inner.client = Some(BasicClient::new(
-                self.client_id.clone(),
-                self.client_secret.clone(),
-                AuthUrl::new(openid_configuration.authorization_endpoint.clone())?,
-                Some(TokenUrl::new(openid_configuration.token_endpoint.clone())?)
-            )
-                .set_redirect_uri(self.redirect_url.clone())
-            );
+            let mut client = BasicClient::new(self.client_id.clone())
+                .set_auth_uri(AuthUrl::new(openid_configuration.authorization_endpoint.clone())?)
+                .set_token_uri(TokenUrl::new(openid_configuration.token_endpoint.clone())?)
+                .set_redirect_uri(self.redirect_url.clone());
+            if self.client_secret.is_some() {
+                client = client.set_client_secret(self.client_secret.as_ref().unwrap().clone());
+            }
+            inner.client = Some(client);
         }
 
         Ok(inner.client.as_ref().unwrap().clone())
@@ -126,7 +129,7 @@ impl AuthProvider for OAuth2Provider {
                 .exchange_code(AuthorizationCode::new(token))
                 // Set the PKCE code verifier.
                 .set_pkce_verifier(PkceCodeVerifier::new(pkce_verifier))
-                .request_async(async_http_client)
+                .request_async(&self.inner.lock().unwrap().borrow().http_client)
                 .await?;
 
             let inner_lock = self.inner.lock().unwrap();
