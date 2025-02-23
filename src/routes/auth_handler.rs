@@ -87,27 +87,33 @@ pub(crate) async fn auth_redirect(
         .http_only(true)
         .path("/")
         .expires(OffsetDateTime::now_utc().checked_add(Duration::days(1)));
-    if let Some(cookie_domain) = pipeline.cookie.domain.as_ref().or(context.headers.x_forwarded_host.as_ref()) {
-        cookie = cookie.domain(cookie_domain);
-    } else {
-        log::debug!(target: LOG_TARGET, "Could not determine cookie domain for request, leaving blank, it may not work");
+    match pipeline.cookie.domain.as_ref().or(context.headers.x_forwarded_host.as_ref()) {
+        Some(cookie_domain) => {
+            cookie = cookie.domain(cookie_domain);
+        }
+        _ => {
+            log::debug!(target: LOG_TARGET, "Could not determine cookie domain for request, leaving blank, it may not work");
+        }
     }
 
     log::debug!(target: LOG_TARGET, "Procesed login and created cookie for user {sub}");
-    if let Some(redirect_uri) = get_redirect_uri(&context) {
-        // NOTE: to be able to set all cookies, it should redirect to the same URL (for some reason)
-        //       this way, traefik sends the cookies to the browser and next time will have them
-        HttpResponse::TemporaryRedirect()
-            .append_header(("Location", redirect_uri))
-            .cookie(cookie.finish())
-            .append_header((USER_HEADER_NAME, sub2))
-            .finish()
-    } else {
-        // if we don't have a redirect uri then just return OK, traefik will dismiss the cookie sadly
-        HttpResponse::Ok()
-            .cookie(cookie.finish())
-            .append_header((USER_HEADER_NAME, sub2))
-            .finish()
+    match get_redirect_uri(&context) {
+        Some(redirect_uri) => {
+            // NOTE: to be able to set all cookies, it should redirect to the same URL (for some reason)
+            //       this way, traefik sends the cookies to the browser and next time will have them
+            HttpResponse::TemporaryRedirect()
+                .append_header(("Location", redirect_uri))
+                .cookie(cookie.finish())
+                .append_header((USER_HEADER_NAME, sub2))
+                .finish()
+        }
+        _ => {
+            // if we don't have a redirect uri then just return OK, traefik will dismiss the cookie sadly
+            HttpResponse::Ok()
+                .cookie(cookie.finish())
+                .append_header((USER_HEADER_NAME, sub2))
+                .finish()
+        }
     }
 }
 

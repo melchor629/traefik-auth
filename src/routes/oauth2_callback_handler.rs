@@ -49,16 +49,19 @@ pub(crate) async fn handler(
         session.insert("oauth2:iss", query.iss.as_ref().unwrap()).expect("bum");
     }
 
-    if let Some(redirect_uri) = session.get::<String>("auth:redirect_uri").expect("bum") {
-        log::debug!(target: LOG_TARGET, "Redirecting to {redirect_uri}");
-        session.remove("auth:redirect_uri");
-        HttpResponse::TemporaryRedirect()
-            .append_header(("Location", redirect_uri))
-            .finish()
-    } else {
-        log::debug!(target: LOG_TARGET, "Redirecting to /auth");
-        HttpResponse::TemporaryRedirect()
-            .append_header(("Location", "/auth"))
-            .finish()
+    match session.get::<String>("auth:redirect_uri").expect("bum") {
+        Some(redirect_uri) => {
+            log::debug!(target: LOG_TARGET, "Redirecting to {redirect_uri}");
+            session.remove("auth:redirect_uri");
+            HttpResponse::TemporaryRedirect()
+                .append_header(("Location", redirect_uri))
+                .finish()
+        }
+        _ => {
+            log::debug!(target: LOG_TARGET, "Redirecting to /auth");
+            HttpResponse::TemporaryRedirect()
+                .append_header(("Location", "/auth"))
+                .finish()
+        }
     }
 }
