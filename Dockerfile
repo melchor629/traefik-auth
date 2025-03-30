@@ -1,5 +1,5 @@
 ARG SOURCE=builder
-ARG IMAGE_TAG=11-slim
+ARG IMAGE_TAG=12-slim
 
 FROM lukemathwalker/cargo-chef:latest-rust-1 AS base
 

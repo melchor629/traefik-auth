@@ -2,7 +2,7 @@ name: Container Image
 
 on:
   push:
-    tags: ['*']
+    #tags: ['*']
 
 env:
   REGISTRY: docker.io
@@ -10,44 +10,31 @@ env:
 
 jobs:
   build-binary:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.target.runner }}
     permissions:
       contents: read
     strategy:
       fail-fast: true
       matrix:
         target:
-        - x86_64-unknown-linux-gnu
-        - aarch64-unknown-linux-gnu
+        - runner: ubuntu-24.04
+          arch: x86_64
+        - runner: ubuntu-24.04-arm
+          arch: aarch64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Install cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
-        # run: |
-        #   VERSION=$(curl -sSL https://api.github.com/repos/cross-rs/cross/releases/latest | jq -r '.tag_name')
-        #   FILE_NAME="cross-x86_64-unknown-linux-gnu.tar.gz"
-        #   URL="https://github.com/cross-rs/cross/releases/download/${VERSION}/${FILE_NAME}"
-        #   echo Downloading "$URL"
-        #   wget "$URL"
-        #   echo Extracting "$FILE_NAME"
-        #   tar -xvzf "${FILE_NAME}" -C $HOME/.cargo/bin
-
       - name: Build binary
         run: |
-          cross build --target ${{ matrix.target }} --release
+          cargo build --release
           mkdir dist
-          tag=$(echo ${{ matrix.target }} | cut -d- -f1)
-          cp target/${{ matrix.target }}/release/traefik-auth dist/traefik-auth-${tag}
+          cp target/release/traefik-auth dist/traefik-auth-${{ matrix.target.arch }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: binary-${{ matrix.target }}
+          name: binary-${{ matrix.target.arch }}
           path: dist
 
 
@@ -102,13 +89,13 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      # Build and push Docker image with Buildx (don't push on PR)
+      # Build and push Docker image with Buildx
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          push: true
+          push: false
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
