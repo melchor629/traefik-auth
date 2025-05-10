@@ -9,7 +9,7 @@ edition = "2024"
 actix-web = { version = "4.10", default-features = false, features = ["macros", "cookies", "secure-cookies", "compress-gzip"] }
 actix-session = { version = "0.10", features = ["cookie-session"] }
 async-trait = "0.1"
-awc = { version = "3.6", default-features = false, features = ["compress-gzip", "openssl"] }
+awc = { version = "3.7", default-features = false, features = ["compress-gzip", "openssl"] }
 base64 = "0.22"
 bcrypt = "0.17"
 config = { version = "0.15", default-features = false, features = ["json", "yaml"] }
