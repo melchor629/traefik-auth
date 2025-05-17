@@ -6,7 +6,7 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-actix-web = { version = "4.10", default-features = false, features = ["macros", "cookies", "secure-cookies", "compress-gzip"] }
+actix-web = { version = "4.11", default-features = false, features = ["macros", "cookies", "secure-cookies", "compress-gzip"] }
 actix-session = { version = "0.10", features = ["cookie-session"] }
 async-trait = "0.1"
 awc = { version = "3.7", default-features = false, features = ["compress-gzip", "openssl"] }
