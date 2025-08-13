@@ -37,6 +37,7 @@ async fn main() -> std::io::Result<()> {
             )
             .service(auth_handler::handler)
             .service(oauth2_callback_handler::handler)
+            .service(me_handler::handler)
             .app_data(auth_providers.clone())
             .app_data(crypto.clone())
     })

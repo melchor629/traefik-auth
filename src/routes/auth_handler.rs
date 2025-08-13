@@ -1,12 +1,11 @@
 use std::{sync::Arc, cell::RefCell, collections::HashMap};
 
 use actix_session::SessionExt;
-use actix_web::{get, HttpRequest, HttpResponse, Responder, web, http::header, http::header::HeaderMap, cookie::{Cookie, SameSite, time::{OffsetDateTime, Duration}}};
+use actix_web::{get, HttpRequest, HttpResponse, Responder, web, http::header, http::header::HeaderMap};
 
-use crate::{logic::{crypto::CryptoState, auth_pipeline::get_pipeline_for_request}, providers::{AuthProviders, AuthContext, AuthContextHeaders, AuthResponse, AuthSession}, config::AuthPipeline};
+use crate::{config::AuthPipeline, logic::{auth_pipeline::get_pipeline_for_request, cookie::{parse_session_cookie, set_session_cookie, SessionCookie}, crypto::CryptoState}, providers::{AuthContext, AuthContextHeaders, AuthProviders, AuthResponse, AuthSession}};
 
 const LOG_TARGET: &str = "traefik_auth::handler::auth";
-const COOKIE_NAME: &str = "ta-ls";
 const USER_HEADER_NAME: &str = "X-Forwarded-User";
 
 pub(crate) async fn auth_redirect(
@@ -59,42 +58,20 @@ pub(crate) async fn auth_redirect(
             .finish();
     }
 
-    let mut payload = josekit::jwt::JwtPayload::new();
-    payload.set_claim("sub", Some(sub.clone().into())).expect("?");
-    for (claim_key, claim_value) in claims {
-        payload.set_claim(&claim_key, Some(claim_value.into())).expect("?");
-    }
-
-    let mut header = josekit::jws::JwsHeader::new();
-    header.set_algorithm("none");
-
-    let Ok(token) = josekit::jwt::encode_unsecured(&payload, &header) else {
-        return HttpResponse::InternalServerError()
-            .body("Could not create auth cookie");
-    };
-    let Ok(cookie) = crypto_state.encrypt_and_sign(&token) else {
-        return HttpResponse::InternalServerError()
-            .body("Could not create auth cookie");
-    };
-
-    let sub2 = sub.as_str();
+    let sub = sub.as_str();
     let is_secure = context.headers.x_forwarded_proto.clone().unwrap_or_default()
         .to_ascii_lowercase()
         .eq("https");
-    let mut cookie = Cookie::build(COOKIE_NAME, cookie)
-        .same_site(SameSite::Lax)
-        .secure(is_secure)
-        .http_only(true)
-        .path("/")
-        .expires(OffsetDateTime::now_utc().checked_add(Duration::days(1)));
-    match pipeline.cookie.domain.as_ref().or(context.headers.x_forwarded_host.as_ref()) {
-        Some(cookie_domain) => {
-            cookie = cookie.domain(cookie_domain);
-        }
-        _ => {
-            log::debug!(target: LOG_TARGET, "Could not determine cookie domain for request, leaving blank, it may not work");
-        }
-    }
+    let cookie = set_session_cookie(SessionCookie {
+        sub: sub.to_string(),
+        claims,
+        domain: pipeline.cookie.domain.clone().or(context.headers.x_forwarded_host.clone()),
+        is_secure,
+    }, &crypto_state);
+    let Ok(cookie) = cookie else {
+        return HttpResponse::InternalServerError()
+            .body("Could not create auth cookie");
+    };
 
     log::debug!(target: LOG_TARGET, "Procesed login and created cookie for user {sub}");
     match get_redirect_uri(&context) {
@@ -103,15 +80,15 @@ pub(crate) async fn auth_redirect(
             //       this way, traefik sends the cookies to the browser and next time will have them
             HttpResponse::TemporaryRedirect()
                 .append_header(("Location", redirect_uri))
-                .cookie(cookie.finish())
-                .append_header((USER_HEADER_NAME, sub2))
+                .cookie(cookie)
+                .append_header((USER_HEADER_NAME, sub))
                 .finish()
         }
         _ => {
             // if we don't have a redirect uri then just return OK, traefik will dismiss the cookie sadly
             HttpResponse::Ok()
-                .cookie(cookie.finish())
-                .append_header((USER_HEADER_NAME, sub2))
+                .cookie(cookie)
+                .append_header((USER_HEADER_NAME, sub))
                 .finish()
         }
     }
@@ -132,47 +109,19 @@ pub(crate) async fn handler(
     };
 
     log::debug!(target: LOG_TARGET, "Using pipeline {:?}", pipeline);
-    let Some(cookie) = req.cookie(COOKIE_NAME) else {
-        log::debug!(target: LOG_TARGET, "Starting login process due to cookie not found");
+    let Some(cookie) = parse_session_cookie(&req, &crypto_state) else {
+        log::debug!(target: LOG_TARGET, "There is something wrong with the cookie, start login process");
         return auth_redirect(&req, &auth_providers, &crypto_state, pipeline).await;
     };
-
-    // decrypt cookie
-    let Ok(token) = crypto_state.decrypt_and_verify(cookie.value()) else {
-        log::debug!(target: LOG_TARGET, "Starting login process due to cookie is invalid (decrypt and verify)");
-        return auth_redirect(&req, &auth_providers, &crypto_state, pipeline).await;
-    };
-
-    // validate token
-    let Ok((token_payload, _)) = josekit::jwt::decode_unsecured(token) else {
-        log::debug!(target: LOG_TARGET, "Starting login process due to cookie is invalid (decode jwt)");
-        return auth_redirect(&req, &auth_providers, &crypto_state, pipeline).await;
-    };
-
-    let Some(sub) = token_payload.claim("sub") else {
-        log::debug!(target: LOG_TARGET, "Starting login process due to cookie is invalid (sub claim not found)");
-        return auth_redirect(&req, &auth_providers, &crypto_state, pipeline).await;
-    };
-
-    let Some(sub) = sub.as_str() else {
-        log::debug!(target: LOG_TARGET, "Starting login process due to cookie is invalid (sub claim is not string)");
-        return auth_redirect(&req, &auth_providers, &crypto_state, pipeline).await;
-    };
-
-    let claims = token_payload
-        .claims_set()
-        .iter()
-        .filter_map(|p| p.1.as_str().map(|v| (p.0.clone(), v.to_string())))
-        .collect::<HashMap<String, String>>();
 
     // check user is valid
-    if let Some(http_response) = check_can_access(&pipeline, &sub, &claims) {
+    if let Some(http_response) = check_can_access(&pipeline, &cookie.sub, &cookie.claims) {
         return http_response;
     }
 
-    log::debug!(target: LOG_TARGET, "User {sub} can access");
+    log::debug!(target: LOG_TARGET, "User {} can access", cookie.sub);
     HttpResponse::Ok()
-        .append_header((USER_HEADER_NAME, sub))
+        .append_header((USER_HEADER_NAME, cookie.sub))
         .finish()
 }
 
