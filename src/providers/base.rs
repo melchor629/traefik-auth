@@ -238,7 +238,7 @@ mod test {
         })
     }
 
-    fn generate_context(pipeline: &AuthPipeline) -> AuthContext {
+    fn generate_context(pipeline: &'_ AuthPipeline) -> AuthContext<'_> {
         AuthContext {
             headers: AuthContextHeaders {
                 authorization: None,

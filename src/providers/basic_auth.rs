@@ -175,7 +175,7 @@ mod tests {
         };
     }
 
-    fn generate_context(value: Option<String>, pipeline: &AuthPipeline) -> AuthContext {
+    fn generate_context(value: Option<String>, pipeline: &'_ AuthPipeline) -> AuthContext<'_> {
         AuthContext {
             headers: AuthContextHeaders {
                 authorization: value,

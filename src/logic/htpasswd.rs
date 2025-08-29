@@ -80,7 +80,7 @@ impl<'a> Hash<'a> {
     }
 }
 
-fn parse_hash_entry(entry: &str) -> Option<(Cow<str>, Hash)> {
+fn parse_hash_entry(entry: &'_ str) -> Option<(Cow<'_, str>, Hash<'_>)> {
     let index = entry.find(":")?;
     let username = &entry[..index];
     let hash = &entry[(index + 1)..];
