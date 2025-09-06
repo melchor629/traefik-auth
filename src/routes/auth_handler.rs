@@ -1,9 +1,19 @@
-use std::{sync::Arc, cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 use actix_session::SessionExt;
-use actix_web::{get, HttpRequest, HttpResponse, Responder, web, http::header, http::header::HeaderMap};
+use actix_web::{
+    HttpRequest, HttpResponse, Responder, get, http::header, http::header::HeaderMap, web,
+};
 
-use crate::{config::AuthPipeline, logic::{auth_pipeline::get_pipeline_for_request, cookie::{parse_session_cookie, set_session_cookie, SessionCookie}, crypto::CryptoState}, providers::{AuthContext, AuthContextHeaders, AuthProviders, AuthResponse, AuthSession}};
+use crate::{
+    config::AuthPipeline,
+    logic::{
+        auth_pipeline::get_pipeline_for_request,
+        cookie::{SessionCookie, parse_session_cookie, set_session_cookie},
+        crypto::CryptoState,
+    },
+    providers::{AuthContext, AuthContextHeaders, AuthProviders, AuthResponse, AuthSession},
+};
 
 const LOG_TARGET: &str = "traefik_auth::handler::auth";
 const USER_HEADER_NAME: &str = "X-Forwarded-User";
@@ -26,9 +36,8 @@ pub(crate) async fn auth_redirect(
         Ok(r) => r,
         Err(err) => {
             log::error!(target: LOG_TARGET, "There was an error while processing login: {err}");
-            return HttpResponse::InternalServerError()
-                .body(format!("There was an error: {err}"))
-        },
+            return HttpResponse::InternalServerError().body(format!("There was an error: {err}"));
+        }
     };
     let Some(response) = response else {
         log::debug!(target: LOG_TARGET, "No auth providers respond to this request");
@@ -45,7 +54,9 @@ pub(crate) async fn auth_redirect(
         return http_response;
     }
 
-    let forwarded_method = context.headers.x_forwarded_method
+    let forwarded_method = context
+        .headers
+        .x_forwarded_method
         .as_ref()
         .unwrap_or(&"get".into())
         .to_ascii_lowercase();
@@ -59,18 +70,28 @@ pub(crate) async fn auth_redirect(
     }
 
     let sub = sub.as_str();
-    let is_secure = context.headers.x_forwarded_proto.clone().unwrap_or_default()
+    let is_secure = context
+        .headers
+        .x_forwarded_proto
+        .clone()
+        .unwrap_or_default()
         .to_ascii_lowercase()
         .eq("https");
-    let cookie = set_session_cookie(SessionCookie {
-        sub: sub.to_string(),
-        claims,
-        domain: pipeline.cookie.domain.clone().or(context.headers.x_forwarded_host.clone()),
-        is_secure,
-    }, &crypto_state);
+    let cookie = set_session_cookie(
+        SessionCookie {
+            sub: sub.to_string(),
+            claims,
+            domain: pipeline
+                .cookie
+                .domain
+                .clone()
+                .or(context.headers.x_forwarded_host.clone()),
+            is_secure,
+        },
+        &crypto_state,
+    );
     let Ok(cookie) = cookie else {
-        return HttpResponse::InternalServerError()
-            .body("Could not create auth cookie");
+        return HttpResponse::InternalServerError().body("Could not create auth cookie");
     };
 
     log::debug!(target: LOG_TARGET, "Procesed login and created cookie for user {sub}");
@@ -137,7 +158,9 @@ impl AuthSession for ActixAuthSession {
 
     fn set(&self, key: String, value: String) {
         let session = self.session.borrow();
-        session.insert(key, value).expect("Session set should not fail");
+        session
+            .insert(key, value)
+            .expect("Session set should not fail");
     }
 
     fn delete(&self, key: String) -> bool {
@@ -172,21 +195,27 @@ fn check_can_access(
     sub: &str,
     claims: &HashMap<String, String>,
 ) -> Option<HttpResponse> {
-    let Some(pipeline_claims) = &pipeline.claims else { return None; };
+    let Some(pipeline_claims) = &pipeline.claims else {
+        return None;
+    };
 
     if !pipeline_claims.sub.is_empty() && !pipeline_claims.sub.contains(&sub.to_string()) {
         log::debug!(target: LOG_TARGET, "User {sub} is not allowed to access to this resource");
-        return Some(HttpResponse::Forbidden()
-            .append_header(("X-Forwarded-User", sub))
-            .body("You are not allowed to access here"));
+        return Some(
+            HttpResponse::Forbidden()
+                .append_header(("X-Forwarded-User", sub))
+                .body("You are not allowed to access here"),
+        );
     }
 
     for (claim_key, claim_values) in pipeline_claims.other.iter() {
         if !claims.contains_key(claim_key) || !claim_values.contains(&claims[claim_key]) {
             log::debug!(target: LOG_TARGET, "User {sub} does not have an allowed {claim_key} claim to access to this resource");
-            return Some(HttpResponse::Forbidden()
-                .append_header(("X-Forwarded-User", sub))
-                .body("You are not allowed to access here"));
+            return Some(
+                HttpResponse::Forbidden()
+                    .append_header(("X-Forwarded-User", sub))
+                    .body("You are not allowed to access here"),
+            );
         }
     }
 
@@ -206,16 +235,17 @@ fn build_response(auth_response: AuthResponse, context: &AuthContext) -> HttpRes
             HttpResponse::TemporaryRedirect()
                 .append_header((header::LOCATION, url))
                 .finish()
-        },
+        }
         AuthResponse::Unauthorized => {
             log::debug!(target: LOG_TARGET, "Auth response is unauthorized");
             HttpResponse::Unauthorized().finish()
-        },
+        }
         AuthResponse::Unknown(sub) => {
             log::debug!(target: LOG_TARGET, "Auth response is unknown {sub}");
-            HttpResponse::Unauthorized()
-                .body(format!("There is something wrong with data provided for user {sub}"))
-        },
+            HttpResponse::Unauthorized().body(format!(
+                "There is something wrong with data provided for user {sub}"
+            ))
+        }
         // this branch should never run
         AuthResponse::Success(_, _) => HttpResponse::Ok().finish(),
     }

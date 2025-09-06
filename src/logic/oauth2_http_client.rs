@@ -2,7 +2,10 @@ use std::{error::Error, fmt::Display, future::Future, pin::Pin};
 
 use actix_web::error::PayloadError;
 use awc::{Client, error::SendRequestError};
-use oauth2::{http::{header::InvalidHeaderValue, HeaderValue, Response}, AsyncHttpClient, HttpRequest, HttpResponse};
+use oauth2::{
+    AsyncHttpClient, HttpRequest, HttpResponse,
+    http::{HeaderValue, Response, header::InvalidHeaderValue},
+};
 
 #[derive(Debug)]
 pub(crate) enum OAuth2HttpError {
@@ -27,9 +30,7 @@ impl<'c> AsyncHttpClient<'c> for OAuth2HttpClient {
 
     fn call(&'c self, request: HttpRequest) -> Self::Future {
         Box::pin(async move {
-            let client = Client::builder()
-                .disable_redirects()
-                .finish();
+            let client = Client::builder().disable_redirects().finish();
 
             let mut awc_request = match request.method().as_str() {
                 "GET" => client.get(request.uri().to_string()),
@@ -46,10 +47,10 @@ impl<'c> AsyncHttpClient<'c> for OAuth2HttpClient {
                 awc_request.send()
             } else {
                 awc_request.send_body(request_body)
-            }.await?;
+            }
+            .await?;
 
-            let mut builder = Response::builder()
-                .status(awc_response.status().as_u16());
+            let mut builder = Response::builder().status(awc_response.status().as_u16());
             for (key, value) in awc_response.headers().iter() {
                 let header_value = HeaderValue::from_bytes(value.as_bytes())?;
                 builder = builder.header(key.as_str(), header_value);

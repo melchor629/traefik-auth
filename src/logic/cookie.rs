@@ -1,6 +1,12 @@
 use std::collections::HashMap;
 
-use actix_web::{cookie::{time::{Duration, OffsetDateTime}, Cookie, SameSite}, HttpRequest};
+use actix_web::{
+    HttpRequest,
+    cookie::{
+        Cookie, SameSite,
+        time::{Duration, OffsetDateTime},
+    },
+};
 
 use crate::logic::crypto::CryptoState;
 
@@ -55,7 +61,10 @@ pub(crate) fn set_session_cookie<'a>(
     Ok(cookie.finish())
 }
 
-pub(crate) fn parse_session_cookie(req: &HttpRequest, crypto_state: &CryptoState) -> Option<SessionCookie> {
+pub(crate) fn parse_session_cookie(
+    req: &HttpRequest,
+    crypto_state: &CryptoState,
+) -> Option<SessionCookie> {
     // read cookie
     let Some(cookie) = read_session_cookie(req) else {
         log::debug!(target: LOG_TARGET, "Session cookie not found");

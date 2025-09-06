@@ -1,7 +1,14 @@
-use crate::{providers::{AuthContextHeaders, AuthProviders}, config::{AuthPipeline, AuthRule}};
+use crate::{
+    config::{AuthPipeline, AuthRule},
+    providers::{AuthContextHeaders, AuthProviders},
+};
 
-pub(crate) fn get_pipeline_for_request<'a>(headers: &AuthContextHeaders, auth_providers: &'a AuthProviders) -> Option<&'a AuthPipeline> {
-    auth_providers.pipelines()
+pub(crate) fn get_pipeline_for_request<'a>(
+    headers: &AuthContextHeaders,
+    auth_providers: &'a AuthProviders,
+) -> Option<&'a AuthPipeline> {
+    auth_providers
+        .pipelines()
         .into_iter()
         .find(|f| matches_rules(headers, &f.rules))
 }
@@ -18,27 +25,35 @@ fn matches_rules(headers: &AuthContextHeaders, rules: &Vec<AuthRule>) -> bool {
 fn matches_rule(headers: &AuthContextHeaders, rule: &AuthRule) -> bool {
     match rule {
         // TODO regex?
-        AuthRule::HttpHost(host) =>
-            headers.x_forwarded_host.as_ref().map_or(false, |h| h.eq_ignore_ascii_case(host)),
-        AuthRule::HttpMethod(methods) =>
-            headers.x_forwarded_method.as_ref()
-                .map_or(false, |m| methods.iter().any(|method| m.eq_ignore_ascii_case(method))),
-        AuthRule::HttpPath(path) =>
-            headers.x_forwarded_uri.as_ref().map_or(false, |p| p == path),
-        AuthRule::HttpPathPrefix(path_prefix) =>
-            headers.x_forwarded_uri.as_ref().map_or(false, |p| p.starts_with(path_prefix)),
-        AuthRule::HttpProtocol(protocol) =>
-            headers.x_forwarded_proto.as_ref().map_or(false, |p| p.eq_ignore_ascii_case(protocol)),
-        AuthRule::Or(sub_rules) =>
-            sub_rules.iter()
-                .map(|sr| matches_rule(headers, sr))
-                .reduce(|a, b| a || b)
-                .unwrap_or(false),
-        AuthRule::And(sub_rules) =>
-            sub_rules.iter()
-                .map(|sr| matches_rule(headers, sr))
-                .reduce(|a, b| a && b)
-                .unwrap_or(true),
+        AuthRule::HttpHost(host) => headers
+            .x_forwarded_host
+            .as_ref()
+            .map_or(false, |h| h.eq_ignore_ascii_case(host)),
+        AuthRule::HttpMethod(methods) => headers.x_forwarded_method.as_ref().map_or(false, |m| {
+            methods.iter().any(|method| m.eq_ignore_ascii_case(method))
+        }),
+        AuthRule::HttpPath(path) => headers
+            .x_forwarded_uri
+            .as_ref()
+            .map_or(false, |p| p == path),
+        AuthRule::HttpPathPrefix(path_prefix) => headers
+            .x_forwarded_uri
+            .as_ref()
+            .map_or(false, |p| p.starts_with(path_prefix)),
+        AuthRule::HttpProtocol(protocol) => headers
+            .x_forwarded_proto
+            .as_ref()
+            .map_or(false, |p| p.eq_ignore_ascii_case(protocol)),
+        AuthRule::Or(sub_rules) => sub_rules
+            .iter()
+            .map(|sr| matches_rule(headers, sr))
+            .reduce(|a, b| a || b)
+            .unwrap_or(false),
+        AuthRule::And(sub_rules) => sub_rules
+            .iter()
+            .map(|sr| matches_rule(headers, sr))
+            .reduce(|a, b| a && b)
+            .unwrap_or(true),
     }
 }
 
@@ -81,7 +96,10 @@ mod test {
             x_forwarded_proto: None,
             x_forwarded_uri: None,
         };
-        let result = matches_rule(&headers, &AuthRule::HttpMethod(vec!["post".into(), "get".into()]));
+        let result = matches_rule(
+            &headers,
+            &AuthRule::HttpMethod(vec!["post".into(), "get".into()]),
+        );
         assert_eq!(result, true);
     }
 
@@ -152,7 +170,10 @@ mod test {
         };
         let result = matches_rule(&headers, &AuthRule::HttpPathPrefix("/another".into()));
         assert_eq!(result, false);
-        let result = matches_rule(&headers, &AuthRule::HttpPathPrefix("/some/path/inside".into()));
+        let result = matches_rule(
+            &headers,
+            &AuthRule::HttpPathPrefix("/some/path/inside".into()),
+        );
         assert_eq!(result, false);
     }
 
@@ -191,10 +212,13 @@ mod test {
             x_forwarded_proto: Some("https".into()),
             x_forwarded_uri: None,
         };
-        let result = matches_rule(&headers, &AuthRule::Or(vec![
-            AuthRule::HttpProtocol("HTTPS".into()),
-            AuthRule::HttpProtocol("HTTP".into()),
-        ]));
+        let result = matches_rule(
+            &headers,
+            &AuthRule::Or(vec![
+                AuthRule::HttpProtocol("HTTPS".into()),
+                AuthRule::HttpProtocol("HTTP".into()),
+            ]),
+        );
         assert_eq!(result, true);
     }
 
@@ -207,10 +231,13 @@ mod test {
             x_forwarded_proto: Some("https".into()),
             x_forwarded_uri: None,
         };
-        let result = matches_rule(&headers, &AuthRule::Or(vec![
-            AuthRule::HttpProtocol("HTTP".into()),
-            AuthRule::HttpProtocol("HTTPS".into()),
-        ]));
+        let result = matches_rule(
+            &headers,
+            &AuthRule::Or(vec![
+                AuthRule::HttpProtocol("HTTP".into()),
+                AuthRule::HttpProtocol("HTTPS".into()),
+            ]),
+        );
         assert_eq!(result, true);
     }
 
@@ -223,10 +250,13 @@ mod test {
             x_forwarded_proto: None,
             x_forwarded_uri: None,
         };
-        let result = matches_rule(&headers, &AuthRule::Or(vec![
-            AuthRule::HttpProtocol("HTTP".into()),
-            AuthRule::HttpProtocol("HTTPS".into()),
-        ]));
+        let result = matches_rule(
+            &headers,
+            &AuthRule::Or(vec![
+                AuthRule::HttpProtocol("HTTP".into()),
+                AuthRule::HttpProtocol("HTTPS".into()),
+            ]),
+        );
         assert_eq!(result, false);
     }
 
@@ -252,10 +282,13 @@ mod test {
             x_forwarded_proto: Some("https".into()),
             x_forwarded_uri: None,
         };
-        let result = matches_rule(&headers, &AuthRule::And(vec![
-            AuthRule::HttpProtocol("HTTPS".into()),
-            AuthRule::HttpMethod(vec!["GET".into()]),
-        ]));
+        let result = matches_rule(
+            &headers,
+            &AuthRule::And(vec![
+                AuthRule::HttpProtocol("HTTPS".into()),
+                AuthRule::HttpMethod(vec!["GET".into()]),
+            ]),
+        );
         assert_eq!(result, false);
     }
 
@@ -268,10 +301,13 @@ mod test {
             x_forwarded_proto: Some("https".into()),
             x_forwarded_uri: None,
         };
-        let result = matches_rule(&headers, &AuthRule::And(vec![
-            AuthRule::HttpProtocol("HTTP".into()),
-            AuthRule::HttpMethod(vec!["GET".into()]),
-        ]));
+        let result = matches_rule(
+            &headers,
+            &AuthRule::And(vec![
+                AuthRule::HttpProtocol("HTTP".into()),
+                AuthRule::HttpMethod(vec!["GET".into()]),
+            ]),
+        );
         assert_eq!(result, false);
     }
 
@@ -284,10 +320,13 @@ mod test {
             x_forwarded_proto: Some("https".into()),
             x_forwarded_uri: None,
         };
-        let result = matches_rule(&headers, &AuthRule::And(vec![
-            AuthRule::HttpProtocol("HTTP".into()),
-            AuthRule::HttpMethod(vec!["GET".into()]),
-        ]));
+        let result = matches_rule(
+            &headers,
+            &AuthRule::And(vec![
+                AuthRule::HttpProtocol("HTTP".into()),
+                AuthRule::HttpMethod(vec!["GET".into()]),
+            ]),
+        );
         assert_eq!(result, false);
     }
 
@@ -313,14 +352,12 @@ mod test {
             x_forwarded_proto: None,
             x_forwarded_uri: None,
         };
-        let pipeline = AuthProviders::create_for_testing(vec![
-            AuthPipeline {
-                claims: None,
-                cookie: Default::default(),
-                providers: vec![],
-                rules: vec![],
-            },
-        ]);
+        let pipeline = AuthProviders::create_for_testing(vec![AuthPipeline {
+            claims: None,
+            cookie: Default::default(),
+            providers: vec![],
+            rules: vec![],
+        }]);
         let result = get_pipeline_for_request(&headers, &pipeline);
         assert_eq!(result.is_some(), true);
     }
@@ -334,16 +371,12 @@ mod test {
             x_forwarded_proto: None,
             x_forwarded_uri: None,
         };
-        let pipeline = AuthProviders::create_for_testing(vec![
-            AuthPipeline {
-                claims: None,
-                cookie: Default::default(),
-                providers: vec![],
-                rules: vec![
-                    AuthRule::HttpHost("example.com".into()),
-                ],
-            },
-        ]);
+        let pipeline = AuthProviders::create_for_testing(vec![AuthPipeline {
+            claims: None,
+            cookie: Default::default(),
+            providers: vec![],
+            rules: vec![AuthRule::HttpHost("example.com".into())],
+        }]);
         let result = get_pipeline_for_request(&headers, &pipeline);
         assert_eq!(result.is_some(), true);
     }
@@ -357,17 +390,15 @@ mod test {
             x_forwarded_proto: None,
             x_forwarded_uri: None,
         };
-        let pipeline = AuthProviders::create_for_testing(vec![
-            AuthPipeline {
-                claims: None,
-                cookie: Default::default(),
-                providers: vec![],
-                rules: vec![
-                    AuthRule::HttpHost("example.com".into()),
-                    AuthRule::HttpMethod(vec!["get".into()]),
-                ],
-            },
-        ]);
+        let pipeline = AuthProviders::create_for_testing(vec![AuthPipeline {
+            claims: None,
+            cookie: Default::default(),
+            providers: vec![],
+            rules: vec![
+                AuthRule::HttpHost("example.com".into()),
+                AuthRule::HttpMethod(vec!["get".into()]),
+            ],
+        }]);
         let result = get_pipeline_for_request(&headers, &pipeline);
         assert_eq!(result.is_some(), true);
     }
@@ -381,16 +412,12 @@ mod test {
             x_forwarded_proto: None,
             x_forwarded_uri: None,
         };
-        let pipeline = AuthProviders::create_for_testing(vec![
-            AuthPipeline {
-                claims: None,
-                cookie: Default::default(),
-                providers: vec![],
-                rules: vec![
-                    AuthRule::HttpHost("example.com".into()),
-                ],
-            },
-        ]);
+        let pipeline = AuthProviders::create_for_testing(vec![AuthPipeline {
+            claims: None,
+            cookie: Default::default(),
+            providers: vec![],
+            rules: vec![AuthRule::HttpHost("example.com".into())],
+        }]);
         let result = get_pipeline_for_request(&headers, &pipeline);
         assert_eq!(result.is_none(), true);
     }

@@ -1,16 +1,30 @@
-use std::{cell::RefCell, collections::{BTreeMap, HashMap}, str::FromStr, sync::{Arc, Mutex}};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
 
 use async_trait::async_trait;
-use jaws::{key::{DeserializeJWK, JWKeyType}, token::Unverified, Claims, SignatureBytes, TokenVerifier};
-use oauth2::{basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl};
+use jaws::{
+    Claims, SignatureBytes, TokenVerifier,
+    key::{DeserializeJWK, JWKeyType},
+    token::Unverified,
+};
+use oauth2::{
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet,
+    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
+    basic::BasicClient,
+};
 
 use crate::logic::oauth2_http_client::OAuth2HttpClient;
 
-use super::{AuthContext, AuthProvider, AuthResponse, AuthError};
+use super::{AuthContext, AuthError, AuthProvider, AuthResponse};
 
 const LOG_TARGET: &str = "traefik_auth::oauth2";
 
-type BasicOauthClient = BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
+type BasicOauthClient =
+    BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
 
 #[derive(serde::Deserialize)]
 struct JsonWebKey {
@@ -26,7 +40,7 @@ struct JsonWebKey {
 
 #[derive(serde::Deserialize)]
 struct JWKS {
-    keys: Vec<JsonWebKey>
+    keys: Vec<JsonWebKey>,
 }
 
 type DynTokenVerifier = Box<dyn TokenVerifier<SignatureBytes>>;
@@ -84,7 +98,8 @@ impl OAuth2Provider {
         if inner.openid_configuration.is_none() {
             log::debug!(target: LOG_TARGET, "Requesting OpenID Configuration to issuer {}", self.issuer);
             let url = format!("{}/.well-known/openid-configuration", self.issuer);
-            let openid_configuration = client.get(url)
+            let openid_configuration = client
+                .get(url)
                 .send()
                 .await?
                 .json::<OpenidConfiguration>()
@@ -92,10 +107,15 @@ impl OAuth2Provider {
             inner.openid_configuration = Some(openid_configuration);
         }
 
-        let openid_configuration = inner.openid_configuration.as_ref().map(|v| v.clone()).unwrap();
+        let openid_configuration = inner
+            .openid_configuration
+            .as_ref()
+            .map(|v| v.clone())
+            .unwrap();
         if inner.jwks.is_none() {
             log::debug!(target: LOG_TARGET, "Requesting JWKS to issuer {}", self.issuer);
-            let jwks_bytes = client.get(openid_configuration.jwks_uri.clone())
+            let jwks_bytes = client
+                .get(openid_configuration.jwks_uri.clone())
                 .send()
                 .await?
                 .body()
@@ -108,7 +128,9 @@ impl OAuth2Provider {
         if inner.client.is_none() {
             log::debug!(target: LOG_TARGET, "Creating OAuth2 client for issuer {}", self.issuer);
             let mut client = BasicClient::new(self.client_id.clone())
-                .set_auth_uri(AuthUrl::new(openid_configuration.authorization_endpoint.clone())?)
+                .set_auth_uri(AuthUrl::new(
+                    openid_configuration.authorization_endpoint.clone(),
+                )?)
                 .set_token_uri(TokenUrl::new(openid_configuration.token_endpoint.clone())?)
                 .set_redirect_uri(self.redirect_url.clone());
             if self.client_secret.is_some() {
@@ -121,11 +143,11 @@ impl OAuth2Provider {
     }
 
     fn get_verifier_for_keyid(&self, kid: &str) -> Result<Option<DynTokenVerifier>, AuthError> {
-        type EcEs256 = jaws::algorithms::ecdsa::VerifyingKey::<p256::NistP256>;
-        type EcEs384 = jaws::algorithms::ecdsa::VerifyingKey::<p384::NistP384>;
-        type RsaRs256 = jaws::algorithms::rsa::pkcs1v15::VerifyingKey::<rsa::sha2::Sha256>;
-        type RsaRs384 = jaws::algorithms::rsa::pkcs1v15::VerifyingKey::<rsa::sha2::Sha384>;
-        type RsaRs512 = jaws::algorithms::rsa::pkcs1v15::VerifyingKey::<rsa::sha2::Sha512>;
+        type EcEs256 = jaws::algorithms::ecdsa::VerifyingKey<p256::NistP256>;
+        type EcEs384 = jaws::algorithms::ecdsa::VerifyingKey<p384::NistP384>;
+        type RsaRs256 = jaws::algorithms::rsa::pkcs1v15::VerifyingKey<rsa::sha2::Sha256>;
+        type RsaRs384 = jaws::algorithms::rsa::pkcs1v15::VerifyingKey<rsa::sha2::Sha384>;
+        type RsaRs512 = jaws::algorithms::rsa::pkcs1v15::VerifyingKey<rsa::sha2::Sha512>;
 
         let inner_lock = self.inner.lock().unwrap();
         let inner = inner_lock.borrow();
@@ -138,9 +160,15 @@ impl OAuth2Provider {
                 _ => None,
             },
             RsaRs256::KEY_TYPE => match jwk.algorithm() {
-                Some("RS384") => Some(Box::new(RsaRs384::new(rsa::RsaPublicKey::build(jwk.parameters.clone())?))),
-                Some("RS512") => Some(Box::new(RsaRs512::new(rsa::RsaPublicKey::build(jwk.parameters.clone())?))),
-                _ => Some(Box::new(RsaRs256::new(rsa::RsaPublicKey::build(jwk.parameters.clone())?))),
+                Some("RS384") => Some(Box::new(RsaRs384::new(rsa::RsaPublicKey::build(
+                    jwk.parameters.clone(),
+                )?))),
+                Some("RS512") => Some(Box::new(RsaRs512::new(rsa::RsaPublicKey::build(
+                    jwk.parameters.clone(),
+                )?))),
+                _ => Some(Box::new(RsaRs256::new(rsa::RsaPublicKey::build(
+                    jwk.parameters.clone(),
+                )?))),
             },
             _ => None,
         };
@@ -180,7 +208,8 @@ impl AuthProvider for OAuth2Provider {
                 .await?;
 
             let token_string = token_result.access_token().secret();
-            let token = jaws::Token::<Claims<serde_json::Value>, Unverified<()>>::from_str(&token_string)?;
+            let token =
+                jaws::Token::<Claims<serde_json::Value>, Unverified<()>>::from_str(&token_string)?;
 
             let token_header = token.header();
             let kid = token_header.key_id().unwrap();
@@ -199,7 +228,10 @@ impl AuthProvider for OAuth2Provider {
                     let claim_value = match source_claim.as_str() {
                         "sub" => token_payload.registered.subject.clone(),
                         "aud" => token_payload.registered.audience.clone(),
-                        _ => token_payload.claims.get(source_claim).map(|v| v.as_str().unwrap().to_string()),
+                        _ => token_payload
+                            .claims
+                            .get(source_claim)
+                            .map(|v| v.as_str().unwrap().to_string()),
                     };
                     if let Some(claim) = claim_value {
                         claims.insert(target_claim.clone(), claim);
@@ -207,10 +239,12 @@ impl AuthProvider for OAuth2Provider {
                 }
             }
 
-            return Ok(match token.payload().and_then(|p| p.registered.subject.clone()) {
-                Some(sub) => AuthResponse::Success(sub.into(), claims),
-                None => AuthResponse::Unauthorized,
-            });
+            return Ok(
+                match token.payload().and_then(|p| p.registered.subject.clone()) {
+                    Some(sub) => AuthResponse::Success(sub.into(), claims),
+                    None => AuthResponse::Unauthorized,
+                },
+            );
         }
 
         log::debug!(target: LOG_TARGET, "Starting new OAuth2 process for issuer {}", self.issuer);
@@ -222,17 +256,19 @@ impl AuthProvider for OAuth2Provider {
             .add_scopes(self.scopes.clone().into_iter().map(Scope::new))
             .url();
 
-        ctx.session.set("oauth2:pkce_verifier".into(), pkce_verifier.secret().clone());
-        ctx.session.set("oauth2:csrf_token".into(), csrf_token.secret().clone());
+        ctx.session.set(
+            "oauth2:pkce_verifier".into(),
+            pkce_verifier.secret().clone(),
+        );
+        ctx.session
+            .set("oauth2:csrf_token".into(), csrf_token.secret().clone());
         Ok(AuthResponse::Redirect(auth_url.to_string()))
     }
 }
 
 impl JWKS {
     fn get<'a>(&'a self, kid: &str) -> Option<&'a JsonWebKey> {
-        self.keys
-            .iter()
-            .find(|k| k.key_id == kid)
+        self.keys.iter().find(|k| k.key_id == kid)
     }
 }
 

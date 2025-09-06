@@ -1,8 +1,8 @@
-use std::{sync::Arc, collections::HashMap};
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 
-use crate::config::{AuthProviderSettings, Settings, AuthPipeline};
+use crate::config::{AuthPipeline, AuthProviderSettings, Settings};
 
 use super::{basic_auth::BasicAuthProvider, oauth2::OAuth2Provider};
 
@@ -58,34 +58,37 @@ impl AuthProviders {
         let mut providers = HashMap::new();
         for (provider_id, provider_settings) in settings.providers.iter() {
             let provider: Box<dyn AuthProvider + Sync + Send> = match provider_settings {
-                AuthProviderSettings::Basic(basic_settings) =>
+                AuthProviderSettings::Basic(basic_settings) => {
                     if basic_settings.contents.is_some() {
                         let contents = basic_settings.contents.as_ref().unwrap().as_str();
                         Box::new(BasicAuthProvider::from_contents(
                             contents,
                             basic_settings.claims.clone(),
                         ))
-                    } else if  basic_settings.file.is_some() {
+                    } else if basic_settings.file.is_some() {
                         let path = basic_settings.file.as_ref().unwrap();
-                        Box::new(BasicAuthProvider::from_file(
-                            path,
-                            basic_settings.claims.clone()
-                        ).expect("Could not parse htpasswd file"))
+                        Box::new(
+                            BasicAuthProvider::from_file(path, basic_settings.claims.clone())
+                                .expect("Could not parse htpasswd file"),
+                        )
                     } else {
                         Box::new(BasicAuthProvider::from_contents(
                             "\n",
-                            basic_settings.claims.clone()
+                            basic_settings.claims.clone(),
                         ))
-                    },
-                AuthProviderSettings::OAuth2(oauth2_settings) =>
-                    Box::new(OAuth2Provider::new(
+                    }
+                }
+                AuthProviderSettings::OAuth2(oauth2_settings) => Box::new(
+                    OAuth2Provider::new(
                         oauth2_settings.client_id.clone(),
                         oauth2_settings.client_secret.clone(),
                         oauth2_settings.issuer.clone(),
                         oauth2_settings.scopes.clone(),
                         settings.public_url.clone(),
                         oauth2_settings.map_claims.clone(),
-                    ).expect("There is something wrong in OAuth2 configuration")),
+                    )
+                    .expect("There is something wrong in OAuth2 configuration"),
+                ),
             };
             providers.insert(provider_id.clone(), provider);
         }
@@ -98,16 +101,32 @@ impl AuthProviders {
 
     #[cfg(test)]
     pub(crate) fn create_for_testing(pipelines: Vec<AuthPipeline>) -> Self {
-        Self { providers: HashMap::default(), pipelines }
+        Self {
+            providers: HashMap::default(),
+            pipelines,
+        }
     }
 
     #[cfg(test)]
-    pub(crate) fn create_for_testing2(providers: HashMap<String, Box<dyn AuthProvider + Sync + Send>>) -> Self {
-        Self { providers, pipelines: vec![] }
+    pub(crate) fn create_for_testing2(
+        providers: HashMap<String, Box<dyn AuthProvider + Sync + Send>>,
+    ) -> Self {
+        Self {
+            providers,
+            pipelines: vec![],
+        }
     }
 
-    pub(crate) async fn auth(&self, ctx: &AuthContext<'_>) -> Result<Option<AuthResponse>, AuthError> {
-        for provider in ctx.pipeline.providers.iter().filter_map(|k| self.providers.get(k)) {
+    pub(crate) async fn auth(
+        &self,
+        ctx: &AuthContext<'_>,
+    ) -> Result<Option<AuthResponse>, AuthError> {
+        for provider in ctx
+            .pipeline
+            .providers
+            .iter()
+            .filter_map(|k| self.providers.get(k))
+        {
             let response = provider.handle(ctx).await?;
             // don't ask why, but it works
             let AuthResponse::Unauthorized = response else {
@@ -125,11 +144,15 @@ impl AuthProviders {
 
 #[cfg(test)]
 impl AuthSession for AuthSessionTest {
-    fn get(&self, _key: String) -> Option<String> { None }
+    fn get(&self, _key: String) -> Option<String> {
+        None
+    }
 
     fn set(&self, _key: String, _value: String) {}
 
-    fn delete(&self, _key: String) -> bool { true }
+    fn delete(&self, _key: String) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
@@ -159,11 +182,9 @@ mod test {
 
     #[actix_rt::test]
     async fn provider_return_non_unauthorized_returns_unauthorized() {
-        let (providers, pipeline) = generate_provider_and_pipeline(vec![
-            AuthProviderTest(Some(
-                AuthResponse::Unknown("self".into())
-            )),
-        ]);
+        let (providers, pipeline) = generate_provider_and_pipeline(vec![AuthProviderTest(Some(
+            AuthResponse::Unknown("self".into()),
+        ))]);
         let context = generate_context(&pipeline);
         let result = providers.auth(&context).await;
         assert!(result.is_ok());
@@ -178,11 +199,9 @@ mod test {
 
     #[actix_rt::test]
     async fn provider_return_unauthorized_returns_none() {
-        let (providers, pipeline) = generate_provider_and_pipeline(vec![
-            AuthProviderTest(Some(
-                AuthResponse::Unauthorized
-            )),
-        ]);
+        let (providers, pipeline) = generate_provider_and_pipeline(vec![AuthProviderTest(Some(
+            AuthResponse::Unauthorized,
+        ))]);
         let context = generate_context(&pipeline);
         let result = providers.auth(&context).await;
         assert!(result.is_ok());
@@ -193,12 +212,8 @@ mod test {
     #[actix_rt::test]
     async fn provider_return_non_unauthorized_returns_next_provider() {
         let (providers, pipeline) = generate_provider_and_pipeline(vec![
-            AuthProviderTest(Some(
-                AuthResponse::Unauthorized
-            )),
-            AuthProviderTest(Some(
-                AuthResponse::Redirect("another place".into())
-            )),
+            AuthProviderTest(Some(AuthResponse::Unauthorized)),
+            AuthProviderTest(Some(AuthResponse::Redirect("another place".into()))),
         ]);
         let context = generate_context(&pipeline);
         let result = providers.auth(&context).await;
@@ -214,15 +229,15 @@ mod test {
 
     #[actix_rt::test]
     async fn provider_fails_returns_failure() {
-        let (providers, pipeline) = generate_provider_and_pipeline(vec![
-            AuthProviderTest(None),
-        ]);
+        let (providers, pipeline) = generate_provider_and_pipeline(vec![AuthProviderTest(None)]);
         let context = generate_context(&pipeline);
         let result = providers.auth(&context).await;
         assert!(result.is_err());
     }
 
-    fn generate_provider_and_pipeline(provider: Vec<AuthProviderTest>) -> (AuthProviders, AuthPipeline) {
+    fn generate_provider_and_pipeline(
+        provider: Vec<AuthProviderTest>,
+    ) -> (AuthProviders, AuthPipeline) {
         let mut providers = HashMap::<String, Box<dyn AuthProvider + Sync + Send>>::new();
         let mut provider_keys = Vec::new();
         for (i, p) in provider.into_iter().enumerate() {
@@ -230,12 +245,15 @@ mod test {
             providers.insert(key.clone(), Box::new(p));
             provider_keys.push(key);
         }
-        (AuthProviders::create_for_testing2(providers), AuthPipeline {
-            rules: vec![],
-            claims: None,
-            providers: provider_keys,
-            cookie: Default::default(),
-        })
+        (
+            AuthProviders::create_for_testing2(providers),
+            AuthPipeline {
+                rules: vec![],
+                claims: None,
+                providers: provider_keys,
+                cookie: Default::default(),
+            },
+        )
     }
 
     fn generate_context(pipeline: &'_ AuthPipeline) -> AuthContext<'_> {

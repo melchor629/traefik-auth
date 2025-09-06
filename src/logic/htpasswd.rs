@@ -1,4 +1,4 @@
-use std::{collections::HashMap, borrow::Cow};
+use std::{borrow::Cow, collections::HashMap};
 
 const BCRYPT_ID: &str = "$2y$";
 const SHA1_ID: &str = "{SHA}";
@@ -10,7 +10,7 @@ pub(crate) struct Htpasswd<'a>(HashMap<Cow<'a, str>, Hash<'a>>);
 enum Hash<'a> {
     MD5(), // NOT SUPPORTED
     BCrypt(Cow<'a, str>),
-    Sha1(Cow<'a, str>), // NOT SUPPORTED
+    Sha1(Cow<'a, str>),  // NOT SUPPORTED
     Crypt(Cow<'a, str>), // NOT SUPPORTED (just plain)
 }
 
@@ -65,8 +65,16 @@ impl<'a> Hash<'a> {
         match self {
             Hash::MD5() => false,
             Hash::BCrypt(hash) => bcrypt::verify(password, hash).unwrap(),
-            Hash::Sha1(_) => /* check with SHA1 */ false,
-            Hash::Crypt(hash) => /* check unix crypt || */ password == hash,
+            Hash::Sha1(_) =>
+            /* check with SHA1 */
+            {
+                false
+            }
+            Hash::Crypt(hash) =>
+            /* check unix crypt || */
+            {
+                password == hash
+            }
         }
     }
 

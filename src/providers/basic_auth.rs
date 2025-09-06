@@ -1,14 +1,14 @@
-use std::{path::PathBuf, fs::File, io::Read, collections::HashMap};
+use std::{collections::HashMap, fs::File, io::Read, path::PathBuf};
 
 use async_trait::async_trait;
 use base64::Engine;
 
-use super::{AuthContext, AuthProvider, AuthResponse, AuthError};
+use super::{AuthContext, AuthError, AuthProvider, AuthResponse};
 use crate::logic::htpasswd::Htpasswd;
 
 pub(crate) struct BasicAuthProvider {
     claims: HashMap<String, String>,
-    htpasswd: Htpasswd<'static>
+    htpasswd: Htpasswd<'static>,
 }
 
 impl BasicAuthProvider {
@@ -19,7 +19,10 @@ impl BasicAuthProvider {
         }
     }
 
-    pub(crate) fn from_file(path: &PathBuf, claims: HashMap<String, String>) -> std::io::Result<Self> {
+    pub(crate) fn from_file(
+        path: &PathBuf,
+        claims: HashMap<String, String>,
+    ) -> std::io::Result<Self> {
         let mut file = File::open(path)?;
         let mut buffer = String::new();
         file.read_to_string(&mut buffer)?;
@@ -66,11 +69,15 @@ impl AuthProvider for BasicAuthProvider {
 mod tests {
     use std::sync::Arc;
 
-    use crate::{providers::{AuthContextHeaders, AuthSessionTest}, config::AuthPipeline};
+    use crate::{
+        config::AuthPipeline,
+        providers::{AuthContextHeaders, AuthSessionTest},
+    };
 
     use super::*;
 
-    static HTPASSWD: &str = "user_bcrypt:$2y$05$QzPnkkUycoy1OlP26Ruw6eqvy8GNqTFPwcfITNqzpkKLNHc3F0Hke\n";
+    static HTPASSWD: &str =
+        "user_bcrypt:$2y$05$QzPnkkUycoy1OlP26Ruw6eqvy8GNqTFPwcfITNqzpkKLNHc3F0Hke\n";
 
     #[actix_rt::test]
     async fn correct_header_value_returns_success() {

@@ -1,6 +1,12 @@
-use std::{string::FromUtf8Error, fmt::Display, path::Path, fs::File, io::{ErrorKind, Read, Write}};
+use std::{
+    fmt::Display,
+    fs::File,
+    io::{ErrorKind, Read, Write},
+    path::Path,
+    string::FromUtf8Error,
+};
 
-use base64::{DecodeError, engine::general_purpose::URL_SAFE as BASE64_ENGINE, Engine};
+use base64::{DecodeError, Engine, engine::general_purpose::URL_SAFE as BASE64_ENGINE};
 use orion::{aead, auth, errors};
 
 pub(crate) struct CryptoState {
@@ -24,13 +30,14 @@ impl CryptoState {
             Err(err) => match err.kind() {
                 ErrorKind::NotFound => return Ok(CryptoState::default().write_to(path)?),
                 _ => return Err(err),
-            }
+            },
         };
 
         let mut encrypt_key_buf = [0_u8; 32];
         let mut hash_key_buf = [0_u8; 32];
         let mut cookie_key_buf = [0_u8; 64];
-        let read_result = file.read_exact(&mut encrypt_key_buf)
+        let read_result = file
+            .read_exact(&mut encrypt_key_buf)
             .and_then(|_| file.read_exact(&mut hash_key_buf))
             .and_then(|_| file.read_exact(&mut cookie_key_buf));
         match read_result {
@@ -84,7 +91,9 @@ impl CryptoState {
     }
 
     pub(crate) fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError> {
-        Ok(auth::authenticate(&self.hash_key, data)?.unprotected_as_bytes().into())
+        Ok(auth::authenticate(&self.hash_key, data)?
+            .unprotected_as_bytes()
+            .into())
     }
 
     pub(crate) fn encrypt_and_sign(&self, value: &str) -> Result<String, CryptoError> {
@@ -105,7 +114,8 @@ impl CryptoState {
 impl Clone for CryptoState {
     fn clone(&self) -> Self {
         Self {
-            encrypt_key: aead::SecretKey::from_slice(self.encrypt_key.unprotected_as_bytes()).expect("."),
+            encrypt_key: aead::SecretKey::from_slice(self.encrypt_key.unprotected_as_bytes())
+                .expect("."),
             hash_key: auth::SecretKey::from_slice(self.hash_key.unprotected_as_bytes()).expect("."),
             cookie_key: self.cookie_key.clone(),
         }
@@ -144,7 +154,9 @@ impl Display for CryptoError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CryptoError::BadSyntax => write!(f, "The value has an invalid format"),
-            CryptoError::CryptographyError(err) => write!(f, "Failed decrypting and verifying {err}"),
+            CryptoError::CryptographyError(err) => {
+                write!(f, "Failed decrypting and verifying {err}")
+            }
             CryptoError::InvalidUtf8(err) => write!(f, "Data contains invalid characters: {err}"),
             CryptoError::BadContent(err) => write!(f, "Invalid base64 content: {err}"),
         }

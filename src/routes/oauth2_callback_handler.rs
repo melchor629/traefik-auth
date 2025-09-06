@@ -1,5 +1,5 @@
 use actix_session::SessionExt;
-use actix_web::{get, HttpRequest, HttpResponse, Responder, web};
+use actix_web::{HttpRequest, HttpResponse, Responder, get, web};
 use serde::Deserialize;
 
 const LOG_TARGET: &str = "traefik_auth::handler::oauth2_callback";
@@ -13,12 +13,11 @@ pub struct Query {
 }
 
 #[get("/oauth2/callback")]
-pub(crate) async fn handler(
-    req: HttpRequest,
-    query: web::Query<Query>,
-) -> impl Responder {
+pub(crate) async fn handler(req: HttpRequest, query: web::Query<Query>) -> impl Responder {
     let session = req.get_session();
-    let csrf_token = session.get::<String>("oauth2:csrf_token").unwrap_or_default();
+    let csrf_token = session
+        .get::<String>("oauth2:csrf_token")
+        .unwrap_or_default();
 
     let Some(csrf_token) = csrf_token else {
         log::debug!(target: LOG_TARGET, "Could not find CSRF Token in session");
@@ -35,8 +34,10 @@ pub(crate) async fn handler(
     }
 
     if query.error.is_some() {
-        return HttpResponse::InternalServerError()
-            .body(format!("Login request failed: {}", query.error.clone().unwrap()));
+        return HttpResponse::InternalServerError().body(format!(
+            "Login request failed: {}",
+            query.error.clone().unwrap()
+        ));
     }
 
     session.remove("oauth2:csrf_token");
@@ -46,7 +47,9 @@ pub(crate) async fn handler(
 
     session.insert("oauth2:token", code).expect("bum");
     if query.iss.is_some() {
-        session.insert("oauth2:iss", query.iss.as_ref().unwrap()).expect("bum");
+        session
+            .insert("oauth2:iss", query.iss.as_ref().unwrap())
+            .expect("bum");
     }
 
     match session.get::<String>("auth:redirect_uri").expect("bum") {
