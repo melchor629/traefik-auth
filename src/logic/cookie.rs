@@ -19,21 +19,20 @@ pub(crate) fn read_session_cookie(req: &HttpRequest) -> Option<Cookie<'static>> 
     req.cookie(COOKIE_NAME)
 }
 
+type Payload = HashMap<String, serde_json::Value>;
+
 #[inline]
 pub(crate) fn set_session_cookie<'a>(
     value: SessionCookie,
     crypto_state: &CryptoState,
 ) -> Result<Cookie<'a>, &'static str> {
-    let mut payload = josekit::jwt::JwtPayload::new();
-    payload.set_claim("sub", Some(value.sub.into())).expect("?");
+    let mut payload = Payload::new();
     for (claim_key, claim_value) in value.claims {
-        payload.set_claim(&claim_key, Some(claim_value.into())).expect("?");
+        payload.insert(claim_key, claim_value.into());
     }
+    payload.insert("sub".to_string(), value.sub.into());
 
-    let mut header = josekit::jws::JwsHeader::new();
-    header.set_algorithm("none");
-
-    let Ok(token) = josekit::jwt::encode_unsecured(&payload, &header) else {
+    let Ok(token) = serde_json::to_string(&payload) else {
         return Err("Could not create JWT");
     };
     let Ok(cookie) = crypto_state.encrypt_and_sign(&token) else {
@@ -70,12 +69,12 @@ pub(crate) fn parse_session_cookie(req: &HttpRequest, crypto_state: &CryptoState
     };
 
     // validate token
-    let Ok((token_payload, _)) = josekit::jwt::decode_unsecured(token) else {
+    let Ok(token_payload) = serde_json::from_str::<Payload>(&token) else {
         log::debug!(target: LOG_TARGET, "Session cookie is invalid (decode jwt)");
         return None;
     };
 
-    let Some(sub) = token_payload.claim("sub") else {
+    let Some(sub) = token_payload.get("sub") else {
         log::debug!(target: LOG_TARGET, "Session cookie is invalid (sub claim not found)");
         return None;
     };
@@ -86,7 +85,6 @@ pub(crate) fn parse_session_cookie(req: &HttpRequest, crypto_state: &CryptoState
     };
 
     let claims = token_payload
-        .claims_set()
         .iter()
         .filter_map(|p| p.1.as_str().map(|v| (p.0.clone(), v.to_string())))
         .collect::<HashMap<String, String>>();

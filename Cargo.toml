@@ -9,14 +9,18 @@ edition = "2024"
 actix-web = { version = "4.11", default-features = false, features = ["macros", "cookies", "secure-cookies", "compress-gzip"] }
 actix-session = { version = "0.10", features = ["cookie-session"] }
 async-trait = "0.1"
-awc = { version = "3.7", default-features = false, features = ["compress-gzip", "openssl"] }
+awc = { version = "3.7", default-features = false, features = ["compress-gzip", "rustls-0_23-native-roots"] }
 base64 = "0.22"
 bcrypt = "0.17"
 config = { version = "0.15", default-features = false, features = ["json", "yaml"] }
 env_logger = { version = "0.11", default-features = false, features = ["humantime", "color", "regex"] }
-josekit = "0.10"
+jaws = { version = "1.0", default-features = false, features = ["p256", "p384", "rsa"] }
 log = { version = "0.4", features = ["std", "serde"] }
+p256 = "0.13"
+p384 = "0.13"
+rsa = "0.9"
 serde = "1.0"
+serde_json = "1.0"
 oauth2 = { version = "5.0", default-features = false }
 orion = "0.17"
 

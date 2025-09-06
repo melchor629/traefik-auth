@@ -1,6 +1,7 @@
-use std::{cell::RefCell, sync::{Arc, Mutex}, collections::HashMap};
+use std::{cell::RefCell, collections::{BTreeMap, HashMap}, str::FromStr, sync::{Arc, Mutex}};
 
 use async_trait::async_trait;
+use jaws::{key::{DeserializeJWK, JWKeyType}, token::Unverified, Claims, SignatureBytes, TokenVerifier};
 use oauth2::{basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl};
 
 use crate::logic::oauth2_http_client::OAuth2HttpClient;
@@ -11,11 +12,30 @@ const LOG_TARGET: &str = "traefik_auth::oauth2";
 
 type BasicOauthClient = BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
 
+#[derive(serde::Deserialize)]
+struct JsonWebKey {
+    #[serde(rename = "kty")]
+    key_type: String,
+
+    #[serde(rename = "kid")]
+    key_id: String,
+
+    #[serde(flatten)]
+    parameters: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(serde::Deserialize)]
+struct JWKS {
+    keys: Vec<JsonWebKey>
+}
+
+type DynTokenVerifier = Box<dyn TokenVerifier<SignatureBytes>>;
+
 #[derive(Default)]
 struct OAuth2ProviderInner {
     client: Option<BasicOauthClient>,
     openid_configuration: Option<OpenidConfiguration>,
-    jwks: Option<josekit::jwk::JwkSet>,
+    jwks: Option<JWKS>,
     http_client: OAuth2HttpClient,
 }
 
@@ -81,7 +101,7 @@ impl OAuth2Provider {
                 .body()
                 .await?
                 .to_vec();
-            let jwks = josekit::jwk::JwkSet::from_bytes(&jwks_bytes)?;
+            let jwks: JWKS = serde_json::from_slice(&jwks_bytes)?;
             inner.jwks = Some(jwks);
         }
 
@@ -98,6 +118,33 @@ impl OAuth2Provider {
         }
 
         Ok(inner.client.as_ref().unwrap().clone())
+    }
+
+    fn get_verifier_for_keyid(&self, kid: &str) -> Result<Option<DynTokenVerifier>, AuthError> {
+        type EcEs256 = jaws::algorithms::ecdsa::VerifyingKey::<p256::NistP256>;
+        type EcEs384 = jaws::algorithms::ecdsa::VerifyingKey::<p384::NistP384>;
+        type RsaRs256 = jaws::algorithms::rsa::pkcs1v15::VerifyingKey::<rsa::sha2::Sha256>;
+        type RsaRs384 = jaws::algorithms::rsa::pkcs1v15::VerifyingKey::<rsa::sha2::Sha384>;
+        type RsaRs512 = jaws::algorithms::rsa::pkcs1v15::VerifyingKey::<rsa::sha2::Sha512>;
+
+        let inner_lock = self.inner.lock().unwrap();
+        let inner = inner_lock.borrow();
+        let jwks = inner.jwks.as_ref().unwrap();
+        let jwk = jwks.get(kid).unwrap();
+        let verifier: Option<DynTokenVerifier> = match jwk.key_type.as_str() {
+            EcEs256::KEY_TYPE => match jwk.algorithm().unwrap() {
+                "ES256" => Some(Box::new(EcEs256::build(jwk.parameters.clone())?)),
+                "ES384" => Some(Box::new(EcEs384::build(jwk.parameters.clone())?)),
+                _ => None,
+            },
+            RsaRs256::KEY_TYPE => match jwk.algorithm() {
+                Some("RS384") => Some(Box::new(RsaRs384::new(rsa::RsaPublicKey::build(jwk.parameters.clone())?))),
+                Some("RS512") => Some(Box::new(RsaRs512::new(rsa::RsaPublicKey::build(jwk.parameters.clone())?))),
+                _ => Some(Box::new(RsaRs256::new(rsa::RsaPublicKey::build(jwk.parameters.clone())?))),
+            },
+            _ => None,
+        };
+        Ok(verifier)
     }
 }
 
@@ -132,51 +179,36 @@ impl AuthProvider for OAuth2Provider {
                 .request_async(&self.inner.lock().unwrap().borrow().http_client)
                 .await?;
 
-            let inner_lock = self.inner.lock().unwrap();
-            let inner = inner_lock.borrow();
-            let jwks = inner.jwks.as_ref().unwrap();
+            let token_string = token_result.access_token().secret();
+            let token = jaws::Token::<Claims<serde_json::Value>, Unverified<()>>::from_str(&token_string)?;
 
-            let token_bytes = token_result.access_token().secret().as_bytes();
-            let header = josekit::jwt::decode_header(token_bytes)?;
-            // TODO refactor semejante mostro
-            let kid = header.claim("kid").unwrap().as_str().unwrap();
-            let jwk_keys = jwks.get(&kid);
-            let jwk = jwk_keys.first().unwrap();
-            let verifier: Option<Box<dyn josekit::jws::JwsVerifier>> = match jwk.key_type() {
-                "EC" => match jwk.algorithm().unwrap() {
-                    "ES256" => Some(Box::new(josekit::jws::ES256.verifier_from_jwk(jwk)?)),
-                    _ => None,
-                },
-                "OKT" => match jwk.algorithm().unwrap() {
-                    "EdDSA" => Some(Box::new(josekit::jws::EdDSA.verifier_from_jwk(jwk)?)),
-                    _ => None,
-                },
-                "RSA" => None,
-                _ => None,
-            };
-            let Some(verifier) = verifier else {
+            let token_header = token.header();
+            let kid = token_header.key_id().unwrap();
+            let Some(verifier) = self.get_verifier_for_keyid(kid)? else {
                 log::error!(target: LOG_TARGET, "Could not determine verifier for JWK {kid}");
                 // TODO maybe error?
                 return Ok(AuthResponse::Unauthorized);
             };
 
-            let (payload, _) = josekit::jwt::decode_with_verifier(token_bytes, verifier.as_ref())?;
+            let token = token.verify::<_, SignatureBytes>(verifier.as_ref())?;
 
             // map claims from oauth2 token to our token
             let mut claims = HashMap::<String, String>::new();
-            for (source_claim, target_claim) in self.map_claims.iter() {
-                if let Some(claim) = payload.claim(&source_claim) {
-                    if let Some(claim_str) = claim.as_str() {
-                        claims.insert(target_claim.clone(), claim_str.into());
+            if let Some(token_payload) = token.payload() {
+                for (source_claim, target_claim) in self.map_claims.iter() {
+                    let claim_value = match source_claim.as_str() {
+                        "sub" => token_payload.registered.subject.clone(),
+                        "aud" => token_payload.registered.audience.clone(),
+                        _ => token_payload.claims.get(source_claim).map(|v| v.as_str().unwrap().to_string()),
+                    };
+                    if let Some(claim) = claim_value {
+                        claims.insert(target_claim.clone(), claim);
                     }
                 }
             }
 
-            return Ok(match payload.claim("sub") {
-                Some(sub) => match sub.as_str() {
-                    Some(sub_str) => AuthResponse::Success(sub_str.into(), claims),
-                    None => AuthResponse::Unauthorized,
-                },
+            return Ok(match token.payload().and_then(|p| p.registered.subject.clone()) {
+                Some(sub) => AuthResponse::Success(sub.into(), claims),
                 None => AuthResponse::Unauthorized,
             });
         }
@@ -193,5 +225,19 @@ impl AuthProvider for OAuth2Provider {
         ctx.session.set("oauth2:pkce_verifier".into(), pkce_verifier.secret().clone());
         ctx.session.set("oauth2:csrf_token".into(), csrf_token.secret().clone());
         Ok(AuthResponse::Redirect(auth_url.to_string()))
+    }
+}
+
+impl JWKS {
+    fn get<'a>(&'a self, kid: &str) -> Option<&'a JsonWebKey> {
+        self.keys
+            .iter()
+            .find(|k| k.key_id == kid)
+    }
+}
+
+impl JsonWebKey {
+    fn algorithm<'a>(&'a self) -> Option<&'a str> {
+        self.parameters.get("alg").and_then(|v| v.as_str())
     }
 }
