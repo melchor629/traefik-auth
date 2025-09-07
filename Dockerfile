@@ -1,7 +1,8 @@
 ARG SOURCE=builder
-ARG IMAGE_TAG=12-slim
 
-FROM lukemathwalker/cargo-chef:latest-rust-1 AS base
+FROM clux/muslrust:stable AS base
+USER root
+RUN cargo install cargo-chef
 
 # plan dependency installation
 FROM base AS planner
@@ -18,37 +19,32 @@ FROM base AS builder
 
 WORKDIR /usr/src/traefik-auth
 COPY --from=planner /usr/src/traefik-auth/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --release --target $(uname -m)-unknown-linux-musl --recipe-path recipe.json
 
 COPY ./Cargo.toml ./Cargo.lock ./
 COPY ./src ./src
-RUN cargo install --path .
+RUN cargo install --target $(uname -m)-unknown-linux-musl --path . && \
+    mv /opt/cargo/bin/traefik-auth /usr/local/bin/traefik-auth
 
 
 # grab binary from outside (using cross)
-FROM debian:${IMAGE_TAG} AS binary
+FROM alpine AS binary
 
 COPY --chown=root:root ./dist/ /dist/
-RUN mkdir -p /usr/local/cargo/bin/
-RUN cp ./dist/traefik-auth-$(uname -m) /usr/local/cargo/bin/traefik-auth
+RUN mkdir -p /usr/local/bin/
+RUN cp ./dist/traefik-auth-$(uname -m) /usr/local/bin/traefik-auth
 
 
 # stage to grab binary based on build arg
 FROM ${SOURCE} AS binary-selector
 
-RUN cp /usr/local/cargo/bin/traefik-auth /
+RUN cp /usr/local/bin/traefik-auth /
 
 
-FROM debian:${IMAGE_TAG} AS final
+FROM gcr.io/distroless/static AS final
 
-ARG TARGETARCH
-ARG DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && \
-    apt-get install -y libssl3 ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
 COPY ./config/default.yml /config/
-COPY --from=binary /usr/local/cargo/bin/traefik-auth /usr/local/bin/
+COPY --from=binary-selector /traefik-auth /usr/local/bin/
 
 USER 1000:999
 
