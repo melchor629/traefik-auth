@@ -191,4 +191,4 @@ providers:
 ```
 
   [forward-auth]: https://doc.traefik.io/traefik/middlewares/http/forwardauth/
-  [docker-hub]: https://hub.docker.com/repository/docker/melchor9000/traefik-auth
+  [docker-hub]: https://hub.docker.com/r/melchor9000/traefik-auth
