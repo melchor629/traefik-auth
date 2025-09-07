@@ -15,27 +15,27 @@ pub(crate) enum OAuth2HttpError {
     ResponseHttpError(oauth2::http::Error),
 }
 
-pub(crate) struct OAuth2HttpClient {}
+pub(crate) struct OAuth2HttpClient<'c> {
+    awc: &'c Client,
+}
 
-impl Default for OAuth2HttpClient {
-    fn default() -> Self {
-        Self {}
+impl<'c> OAuth2HttpClient<'c> {
+    pub(crate) fn with_client(awc: &'c Client) -> OAuth2HttpClient<'c> {
+        OAuth2HttpClient { awc }
     }
 }
 
-impl<'c> AsyncHttpClient<'c> for OAuth2HttpClient {
+impl<'c> AsyncHttpClient<'c> for OAuth2HttpClient<'c> {
     type Error = OAuth2HttpError;
 
     type Future = Pin<Box<dyn Future<Output = Result<HttpResponse, Self::Error>> + 'c>>;
 
     fn call(&'c self, request: HttpRequest) -> Self::Future {
         Box::pin(async move {
-            let client = Client::builder().disable_redirects().finish();
-
             let mut awc_request = match request.method().as_str() {
-                "GET" => client.get(request.uri().to_string()),
-                "POST" => client.post(request.uri().to_string()),
-                _ => client.get(request.uri().to_string()),
+                "GET" => self.awc.get(request.uri().to_string()),
+                "POST" => self.awc.post(request.uri().to_string()),
+                _ => self.awc.get(request.uri().to_string()),
             };
 
             for (key, value) in request.headers().iter() {

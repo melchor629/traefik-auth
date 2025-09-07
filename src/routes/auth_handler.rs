@@ -2,7 +2,9 @@ use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 use actix_session::SessionExt;
 use actix_web::{
-    HttpRequest, HttpResponse, Responder, get, http::header, http::header::HeaderMap, web,
+    HttpRequest, HttpResponse, Responder, get,
+    http::header::{self, HeaderMap},
+    web::{self, ThinData},
 };
 
 use crate::{
@@ -23,6 +25,7 @@ pub(crate) async fn auth_redirect(
     auth_providers: &AuthProviders,
     crypto_state: &CryptoState,
     pipeline: &AuthPipeline,
+    awc_client: ThinData<awc::Client>,
 ) -> HttpResponse {
     let context = AuthContext {
         pipeline,
@@ -30,6 +33,7 @@ pub(crate) async fn auth_redirect(
         session: Arc::new(ActixAuthSession {
             session: req.get_session().clone().into(),
         }),
+        awc: awc_client,
     };
     let response_result = auth_providers.auth(&context).await;
     let response = match response_result {
@@ -120,6 +124,7 @@ pub(crate) async fn handler(
     req: HttpRequest,
     crypto_state: web::Data<CryptoState>,
     auth_providers: web::Data<AuthProviders>,
+    awc_client: web::ThinData<awc::Client>,
 ) -> impl Responder {
     // get pipeline for request
     let auth_headers = get_headers(req.headers());
@@ -132,7 +137,7 @@ pub(crate) async fn handler(
     log::debug!(target: LOG_TARGET, "Using pipeline {:?}", pipeline);
     let Some(cookie) = parse_session_cookie(&req, &crypto_state) else {
         log::debug!(target: LOG_TARGET, "There is something wrong with the cookie, start login process");
-        return auth_redirect(&req, &auth_providers, &crypto_state, pipeline).await;
+        return auth_redirect(&req, &auth_providers, &crypto_state, pipeline, awc_client).await;
     };
 
     // check user is valid

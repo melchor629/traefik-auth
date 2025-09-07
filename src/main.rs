@@ -3,11 +3,16 @@ mod logic;
 mod providers;
 mod routes;
 
+use std::sync::Arc;
+
 use crate::routes::*;
 use actix_session::{
     SessionMiddleware, config::CookieContentSecurity, storage::CookieSessionStore,
 };
-use actix_web::{App, HttpServer, middleware, web};
+use actix_web::{
+    App, HttpServer, middleware,
+    web::{self, ThinData},
+};
 use logic::crypto::CryptoState;
 use providers::AuthProviders;
 
@@ -17,6 +22,7 @@ async fn main() -> std::io::Result<()> {
 
     configure_logger(&settings);
 
+    let rustls_config = Arc::new(rustls_config());
     let crypto = web::Data::new(match &settings.keys_path {
         None => CryptoState::default(),
         Some(path) => CryptoState::from_file(path)?,
@@ -54,6 +60,7 @@ async fn main() -> std::io::Result<()> {
             .service(me_handler::handler)
             .app_data(auth_providers.clone())
             .app_data(crypto.clone())
+            .app_data(ThinData(create_awc_client(&rustls_config)))
     })
     .bind("[::]:8080")?
     .run()
@@ -111,4 +118,25 @@ fn configure_logger(settings: &config::Settings) {
         builder.filter_module(key, *value);
     }
     builder.filter_level(settings.logger.level).init();
+}
+
+#[inline]
+fn rustls_config() -> rustls::ClientConfig {
+    use rustls_platform_verifier::ConfigVerifierExt as _;
+
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
+    // The benefits of the platform verifier are clear; see:
+    // https://github.com/rustls/rustls-platform-verifier#readme
+    rustls::ClientConfig::with_platform_verifier().unwrap()
+}
+
+#[inline]
+fn create_awc_client(client_tls_config: &Arc<rustls::ClientConfig>) -> awc::Client {
+    awc::Client::builder()
+        .add_default_header((awc::http::header::USER_AGENT, "traefik-auth"))
+        .connector(awc::Connector::new().rustls_0_23(Arc::clone(client_tls_config)))
+        .finish()
 }

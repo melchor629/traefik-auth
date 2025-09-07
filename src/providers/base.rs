@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use actix_web::web::ThinData;
 use async_trait::async_trait;
 
 use crate::config::{AuthPipeline, AuthProviderSettings, Settings};
@@ -19,6 +20,7 @@ pub(crate) struct AuthContext<'a> {
     pub(crate) pipeline: &'a AuthPipeline,
     pub(crate) headers: AuthContextHeaders,
     pub(crate) session: Arc<dyn AuthSession>,
+    pub(crate) awc: ThinData<awc::Client>,
 }
 
 pub(crate) trait AuthSession {
@@ -267,6 +269,7 @@ mod test {
             },
             pipeline,
             session: Arc::new(AuthSessionTest()),
+            awc: ThinData(awc::Client::default()),
         }
     }
 }

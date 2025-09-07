@@ -193,6 +193,7 @@ mod tests {
             },
             pipeline,
             session: Arc::new(AuthSessionTest()),
+            awc: actix_web::web::ThinData(awc::Client::default()),
         }
     }
 

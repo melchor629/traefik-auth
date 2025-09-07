@@ -50,7 +50,6 @@ struct OAuth2ProviderInner {
     client: Option<BasicOauthClient>,
     openid_configuration: Option<OpenidConfiguration>,
     jwks: Option<JWKS>,
-    http_client: OAuth2HttpClient,
 }
 
 pub(crate) struct OAuth2Provider {
@@ -90,8 +89,11 @@ impl OAuth2Provider {
         })
     }
 
-    async fn configure(&self) -> Result<BasicOauthClient, Box<dyn std::error::Error>> {
-        let client = awc::Client::default();
+    async fn configure<'a>(
+        &'a self,
+        ctx: &AuthContext<'a>,
+    ) -> Result<BasicOauthClient, Box<dyn std::error::Error>> {
+        let client = &ctx.awc;
         let inner_lock = self.inner.lock().unwrap();
         let mut inner = inner_lock.borrow_mut();
 
@@ -179,7 +181,7 @@ impl OAuth2Provider {
 #[async_trait(?Send)]
 impl AuthProvider for OAuth2Provider {
     async fn handle(&self, ctx: &AuthContext) -> Result<AuthResponse, AuthError> {
-        let client = self.configure().await?;
+        let client = self.configure(ctx).await?;
         let token = ctx.session.get("oauth2:token".into());
         let stored_issuer = ctx.session.get("oauth2:iss".into());
         if let Some(token) = token {
@@ -200,11 +202,12 @@ impl AuthProvider for OAuth2Provider {
 
             log::debug!(target: LOG_TARGET, "Obtaining token from issuer {}", self.issuer);
             ctx.session.delete("oauth2:pkce_verifier".into());
+            let http_client = OAuth2HttpClient::with_client(&ctx.awc);
             let token_result = client
                 .exchange_code(AuthorizationCode::new(token))
                 // Set the PKCE code verifier.
                 .set_pkce_verifier(PkceCodeVerifier::new(pkce_verifier))
-                .request_async(&self.inner.lock().unwrap().borrow().http_client)
+                .request_async(&http_client)
                 .await?;
 
             let token_string = token_result.access_token().secret();
