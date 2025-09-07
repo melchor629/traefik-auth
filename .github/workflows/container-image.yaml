@@ -27,11 +27,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Prepare build target
+        run: |
+          rustup target add $(uname -m)-unknown-linux-musl
+
       - name: Build binary
         run: |
           cargo build --release --target $(uname -m)-unknown-linux-musl
           mkdir dist
-          cp target/release/$(uname -m)-unknown-linux-musl/traefik-auth dist/traefik-auth-${{ matrix.target.arch }}
+          cp target/$(uname -m)-unknown-linux-musl/release/traefik-auth dist/traefik-auth-${{ matrix.target.arch }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
