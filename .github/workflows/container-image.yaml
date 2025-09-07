@@ -13,6 +13,7 @@ jobs:
   build-binary:
     name: 'Build ${{ matrix.target.arch }} binary'
     runs-on: ${{ matrix.target.runner }}
+    container: clux/muslrust:stable
     permissions:
       contents: read
     strategy:
@@ -26,10 +27,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-
-      - name: Prepare build target
-        run: |
-          rustup target add $(uname -m)-unknown-linux-musl
 
       - name: Build binary
         run: |
