@@ -26,7 +26,7 @@ jobs:
           arch: aarch64
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Build binary
         run: |
@@ -62,7 +62,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download binaries
         uses: actions/download-artifact@v6
