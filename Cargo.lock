@@ -1226,9 +1226,9 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
 name = "jaws"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e739086fe13c2ec8e508802559b208ab5ddb987ba2684170ad93070260a37d8a"
+checksum = "a26424e6191bbc669f03b31adc0d32d6c25946120dc053053f1ca6a54be15657"
 dependencies = [
  "base64ct",
  "bytes",
