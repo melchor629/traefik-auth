@@ -36,4 +36,3 @@ split-debuginfo = "unpacked"
 
 [profile.release]
 lto = "thin"
-
