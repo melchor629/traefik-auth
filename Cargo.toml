@@ -20,7 +20,7 @@ p256 = "0.13"
 p384 = "0.13"
 rsa = "0.9"
 rustls = { version = "0.23" }
-rustls-platform-verifier = "0.6"
+rustls-platform-verifier = "0.7"
 serde = "1.0"
 serde_json = "1.0"
 oauth2 = { version = "5.0", default-features = false }
