@@ -13,10 +13,5 @@ updates:
       day: saturday
       time: '10:00'
     groups:
-      updatable:
-        applies-to: version-updates
-        update-types:
-          - "patch"
-          - "minor"
-        patterns:
-          - "*"
+      security:
+        applies-to: security-updates
