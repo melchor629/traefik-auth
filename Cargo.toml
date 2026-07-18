@@ -17,7 +17,7 @@ env_logger = { version = "0.11", default-features = false, features = ["humantim
 jaws = { version = "1.0", default-features = false, features = ["p256", "p384", "rsa"] }
 log = { version = "0.4", features = ["std", "serde"] }
 p256 = "0.13"
-p384 = "0.13"
+p384 = "0.14"
 rsa = "0.9"
 rustls = { version = "0.23" }
 rustls-platform-verifier = "0.7"
