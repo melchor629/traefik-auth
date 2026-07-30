@@ -10,7 +10,7 @@ actix-web = { version = "4.13", default-features = false, features = ["macros", 
 actix-session = { version = "0.11", features = ["cookie-session"] }
 async-trait = "0.1"
 awc = { version = "3.8", default-features = false, features = ["compress-gzip", "rustls-0_23"] }
-base64 = "0.22"
+base64 = "0.23"
 bcrypt = "0.19"
 config = { version = "0.15", default-features = false, features = ["json", "yaml"] }
 env_logger = { version = "0.11", default-features = false, features = ["humantime", "color", "regex"] }
