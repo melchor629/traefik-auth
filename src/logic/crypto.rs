@@ -49,16 +49,16 @@ impl CryptoState {
         };
 
         Ok(CryptoState {
-            encrypt_key: aead::SecretKey::from_slice(&encrypt_key_buf).expect("aead::SecretKey"),
-            hash_key: auth::SecretKey::from_slice(&hash_key_buf).expect("auth::SecretKey"),
+            encrypt_key: (&encrypt_key_buf).try_into().expect("aead::SecretKey"),
+            hash_key: (&hash_key_buf).try_into().expect("auth::SecretKey"),
             cookie_key: actix_web::cookie::Key::from(&cookie_key_buf),
         })
     }
 
     fn write_to(self, path: &Path) -> std::io::Result<Self> {
         let mut file = File::create(path)?;
-        file.write_all(self.encrypt_key.unprotected_as_bytes())?;
-        file.write_all(self.hash_key.unprotected_as_bytes())?;
+        file.write_all(self.encrypt_key.unprotected_as_ref())?;
+        file.write_all(self.hash_key.unprotected_as_ref())?;
         file.write_all(self.cookie_key.master())?;
         Ok(self)
     }
@@ -68,7 +68,7 @@ impl CryptoState {
     }
 
     pub(crate) fn verify(&self, data: &[u8], hash: &[u8]) -> Result<(), CryptoError> {
-        let tag = auth::Tag::from_slice(hash)?;
+        let tag: auth::Tag = hash.try_into()?;
         Ok(auth::authenticate_verify(&tag, &self.hash_key, &data)?)
     }
 
@@ -92,7 +92,7 @@ impl CryptoState {
 
     pub(crate) fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError> {
         Ok(auth::authenticate(&self.hash_key, data)?
-            .unprotected_as_bytes()
+            .unprotected_as_ref()
             .into())
     }
 
@@ -114,9 +114,8 @@ impl CryptoState {
 impl Clone for CryptoState {
     fn clone(&self) -> Self {
         Self {
-            encrypt_key: aead::SecretKey::from_slice(self.encrypt_key.unprotected_as_bytes())
-                .expect("."),
-            hash_key: auth::SecretKey::from_slice(self.hash_key.unprotected_as_bytes()).expect("."),
+            encrypt_key: self.encrypt_key.unprotected_as_ref().try_into().expect("."),
+            hash_key: self.hash_key.unprotected_as_ref().try_into().expect("."),
             cookie_key: self.cookie_key.clone(),
         }
     }
@@ -125,8 +124,8 @@ impl Clone for CryptoState {
 impl Default for CryptoState {
     fn default() -> Self {
         Self {
-            encrypt_key: Default::default(),
-            hash_key: Default::default(),
+            encrypt_key: aead::SecretKey::generate().expect("Could not generate encrypt key"),
+            hash_key: auth::SecretKey::generate().expect("Could not generate hash key"),
             cookie_key: actix_web::cookie::Key::generate(),
         }
     }
