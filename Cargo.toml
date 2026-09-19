@@ -16,7 +16,7 @@ config = { version = "0.15", default-features = false, features = ["json", "yaml
 env_logger = { version = "0.11", default-features = false, features = ["humantime", "color", "regex"] }
 jaws = { version = "1.0", default-features = false, features = ["p256", "p384", "rsa"] }
 log = { version = "0.4", features = ["std", "serde"] }
-p256 = "0.13"
+p256 = "0.14"
 p384 = "0.13"
 rsa = "0.9"
 rustls = { version = "0.23" }
