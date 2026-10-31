@@ -29,6 +29,7 @@ async fn main() -> std::io::Result<()> {
     });
     let auth_providers = web::Data::new(AuthProviders::create(&settings));
     let public_url = awc::http::Uri::try_from(settings.public_url.clone()).ok();
+    let public_url2 = public_url.clone();
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::Compress::default())
@@ -62,7 +63,19 @@ async fn main() -> std::io::Result<()> {
             .app_data(crypto.clone())
             .app_data(ThinData(create_awc_client(&rustls_config)))
     })
-    .bind("[::]:8080")?
+    .workers(
+        settings
+            .workers
+            .or_else(|| std::thread::available_parallelism().map(|a| a.get()).ok())
+            .unwrap_or(2),
+    )
+    .server_hostname::<String>(
+        public_url2
+            .and_then(|u| u.host().map(|h| h.into()))
+            .unwrap_or("localhost".into()),
+    )
+    .tcp_nodelay(true)
+    .bind("localhost:8080")?
     .run()
     .await
 }

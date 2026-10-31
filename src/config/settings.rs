@@ -64,7 +64,7 @@ pub(crate) struct AuthClaims {
     #[serde(default)]
     pub sub: Vec<String>,
     #[serde(flatten, default)]
-    pub other: HashMap<String, String>
+    pub other: HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -93,6 +93,7 @@ pub(crate) struct Settings {
     pub pipelines: Vec<AuthPipeline>,
     pub public_url: String,
     pub keys_path: Option<PathBuf>,
+    pub workers: Option<usize>,
 }
 
 impl Settings {
