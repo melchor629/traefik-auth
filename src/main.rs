@@ -75,7 +75,7 @@ async fn main() -> std::io::Result<()> {
             .unwrap_or("localhost".into()),
     )
     .tcp_nodelay(true)
-    .bind("localhost:8080")?
+    .bind("[::]:8080")?
     .run()
     .await
 }
